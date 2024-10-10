@@ -1,0 +1,294 @@
+# This file contains a few shell aliases and functions
+# to make routine Linode tasks easier.
+#
+# Author: Jan Schaumann <jschauma@netmeister.org>
+#         @jschauma@mstdn.social
+#
+# This file is in the public domain.
+
+# The name of your default SSH key for use with Linode
+LINODE_SSH_KEY="${LINODE_SSH_KEY:-linode}"
+
+_tout=$(which timeout 2>/dev/null)
+if [ -z "${_tout}" ]; then
+	timeout() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+fi
+
+_uname=$(uname)
+
+##
+cloudInitData() {
+	local b64flags=""
+
+	if [ x"${_uname}" = x"Linux" ]; then
+		b64flags="-w 0"
+	fi
+
+	cat <<EOF | base64 ${b64flags}
+#cloud-config
+users:
+  - name: ${USER}
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - $(cat ~/.ssh/${LINODE_SSH_KEY}.pub)
+EOF
+}
+
+###
+# Generic handling of instances first
+###
+
+alias licl='linode-cli --json linodes'
+alias licl_t='linode-cli --ascii-table linodes'
+
+# Linodes must have a root password set, but we don't
+# use it, so generate a new password.
+alias newpass='</dev/urandom env LC_ALL=C tr -dc "[:print:]" | head -c 12'
+
+# Linode creation defaults:
+alias linstance='licl create --authorized_users ${USER} --private_ip false --root_pass "$(newpass)"'
+
+launchLinode() {
+	local image="${1:-linode/debian12}"
+	local region="${2:-us-ord}"
+	local type="${3:-g6-nanode-1}"
+
+	linstance --image "${image}"				\
+		--region "${region}"				\
+		--type "${type}" 				\
+		--label "${image##*/}-${region}"        	\
+		--no-defaults 					\
+		--metadata.user_data "$(cloudInitData)" |	\
+		jq -r '.[].id'
+}
+
+# Turn a linode hostname into an instance ID.
+linID() {
+	local h="${1}"
+	local ip=""
+
+	if [ x"${h}" = x"-h" ]; then
+		echo "Usage: linID <hostname|ip>" >&2
+		return 0
+	fi
+
+	if expr "${h}" : "[0-9.]*$" >/dev/null 2>&1; then
+		ip="${h}"
+	elif ! expr "${h}" : "[0-9.-]*.ip.linodeusercontent.com" > /dev/null 2>&1; then
+		echo "That doesn't look like a Linode hostname." >&2
+		return 1
+	fi
+
+	ip=$(echo ${h} | sed -e 's/.ip.*//' -e 's/-/./g')
+	licl ls --ipv4 "${ip}" | jq -r '.[].id'
+}
+
+# Get an instance's IP addresses.
+linIPs() {
+	local id="${1}"
+	local ipv="${2:-all}"
+	local query=".[].ipv4[],.[].ipv6"
+
+	if [ x"${id}" = x"-h" ]; then
+		echo "Usage: linIPs <id> [v4|v6]" >&2
+		return 0
+	fi
+
+	if [ x"${ipv}" = x"v4" ]; then
+		query=".[].ipv4[]"
+	elif [ x"${ipv}" = x"v6" ]; then
+		query=".[].ipv6"
+	fi
+
+	licl view $id | jq -r "${query}"
+}
+
+# get a hostname from an ID or IP
+linHostname() {
+	local id_or_ip="${1}"
+	local ip
+
+	if [ x"${id}" = x"-h" ]; then
+		echo "Usage: linHostname <id|ip>" >&2
+		return 0
+	fi
+	
+	if ! expr "${id_or_ip}" : "[0-9.]*" > /dev/null 2>&1; then
+		echo "That doesn't look like an IP or ID." >&2
+		return 1
+	fi
+
+	ip="${id_or_ip}"
+	if expr "${id_or_ip}" : "[0-9]*$" >/dev/null 2>&1; then
+		ip=$(linIPs "${id_or_ip}" "v4")
+	fi
+
+	echo "$(echo "${ip}" | tr '.' '-').ip.linodeusercontent.com"
+}
+
+# The table view linode-cli offers may cut off
+# information depending on the width of the terminal,
+# and who wants to always run 'jq ...', so just print
+# a short summary line by line for each instance:
+linSummary() {
+	local arg="${1:-""}"
+	local ids=""
+	local selectArgs=""
+
+	if [ x"${arg}" = x"-h" ]; then
+		echo "linSummary - list Linode instance text summary" >&2
+		echo "Usage: linSummary [<status>|<hostname>|<id>]"
+		return 0
+	fi
+
+	if [ -z "${arg}" ]; then
+		ids="$(linstances)"
+	elif expr "${arg}" : "[0-9]*$" >/dev/null 2>&1; then
+		ids="${h}"
+	elif expr "${arg}" : "[a-z]*$" >/dev/null 2>&1; then
+		ids=$(linstances "${arg}")
+	elif expr "${arg}" : "[0-9.-]*.ip.linodeusercontent.com" > /dev/null 2>&1; then
+		ids="$(linID "${arg}")"
+	fi
+
+	for l in ${ids}; do
+		licl ls --id "${l}" | jq -r '.[] |
+"ID      : \(.id)
+Label   : \(.label)
+Status  : \(.status)
+Created : \(.created)
+Image   : \(.image)
+Region  : \(.region)"'
+		echo "Hostname: $(linHostname ${l})"
+		echo
+	done
+}
+
+# List selected hostnames.
+linnames() {
+	local status="${1:-""}"
+	local jqargs=".[].id"
+
+	if [ x"${status}" = x"-h" ]; then
+		echo "linnames - list Linode instances hostnames" >&2
+		echo "Usage: linnames [<status>]"
+		return 0
+	fi
+
+	for id in $(linstances "${status}"); do
+		linHostname "${id}"
+	done
+}
+
+# List selected linode IDs.
+linstances() {
+	local status="${1:-""}"
+	local jqargs=".[].id"
+
+	if [ x"${status}" = x"-h" ]; then
+		echo "Usage: linstances [<status>]"
+		return 0
+	fi
+
+	if [ -n "${status}" ]; then
+		jqargs=".[] | select(.status == \"${status}\") | .id"
+	fi
+
+	licl ls | eval $(echo "jq -r '${jqargs}'")
+}
+
+# After we start an instance, we have to wait for it
+# to come up.
+linwait() {
+	local ips ip n status
+	local id="${1}"
+	local sleep=60
+
+	if ! expr "${1}" : "[0-9]*$" >/dev/null 2>&1; then
+		echo "That doesn't look like a Linode ID." >&2
+		return 1;
+	fi
+
+	n=0
+	/bin/echo -n "Waiting for linode ${id} to be ready..."
+	while [ ${n} -lt ${sleep} ]; do
+		status="$(licl view ${id} | jq -r ".[].status")"
+		if [ x"${status}" = x"running" ]; then
+			break
+		fi
+		n=$(( n + 5 ))
+		if [ ${n} -eq ${sleep} ]; then
+			echo "Still not up after ${sleep} seconds, bailing out." >&2
+			return 1
+		fi
+		/bin/echo -n "."
+		sleep 5
+	done
+
+	ips="$(linIPs "${id}")"
+	ip="$(echo "${ips}" | grep "\." | head -1)"
+	hname="$(echo ${ip} | tr '.' '-').ip.linodeusercontent.com"
+	echo
+	echo "${id}"
+	echo "${ips}"
+	echo "${hname}"
+
+	if ! lsshCheck "${ip}" ; then
+		echo "Sleeping up to ${sleep} seconds to wait for ssh:"
+
+		n=5
+		while [ ${n} -lt ${sleep} ]; do
+			/bin/echo -n "."
+			sleep 5
+			n=$(( n + 5 ))
+			if lsshCheck "${ip}"; then
+				break
+			fi
+		done
+		echo
+	fi
+
+	if ! ping -q -c 1 "${ip}" >/dev/null 2>&1 ; then
+		echo "${ip} still not up, sorry." >&2
+		return 1
+	else
+		echo "Ready."
+	fi
+}
+
+# Try to determine when SSH is up and running.
+lsshCheck() {
+	local ip="${1}"
+	if [ x"${ip}" = x"-h" ]; then
+		echo "Supported arguments: <ip|id>" >&2
+		return 0
+	fi
+
+	if expr "${ip}" : "[0-9]*$" >/dev/null 2>&1 ; then
+		ip="$(linIPs "${id}" "v4" | head -1)"
+	fi
+
+	if [ -z "${ip}" ]; then
+		echo "Usage: sshCheck <ip|id>" >&2
+		return 1
+	fi
+
+	if ping -q -c 1 "${ip}" >/dev/null 2>&1 ; then
+		timeout 2 /bin/sh -c "echo | nc ${ip} 22 >/dev/null 2>&1" >/dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			return 0
+		fi
+	fi
+
+	return 1
+}
+
+###
+# Specific instances
+###
+
+alias lin-debian='launchLinode'
+alias lin-fedora='launchLinode linode/fedora40'
+alias lin-ubuntu='launchLinode linode/ubuntu24.04'
