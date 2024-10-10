@@ -1,15 +1,13 @@
 # This file contains a few shell aliases and functions
-# that should make it easier for you to work with AWS
-# EC2 within the context of the class CS615 System
-# Administration.
+# that make routine AWS EC2 tasks easier.
 #
 # Author: Jan Schaumann <jschauma@netmeister.org>
 #         @jschauma@mstdn.social
 #
-# See https://stevens.netmeister.org/615/ for more
-# information.
-#
 # This file is in the public domain.
+
+# The name of your preferred SSH key for use with AWS.
+AWS_SSH_KEY="${AWS_SSH_KEY:-aws}"
 
 _tout=$(which timeout 2>/dev/null)
 if [ -z "${_tout}" ]; then
@@ -21,15 +19,7 @@ fi
 ###
 
 alias _aedi='aws ec2 describe-instances --output json'
-
-# First, I'm too lazy to always type
-# 'aws ec2 run-instances ...'
-#
-# In addition, I use a separate SSH key for AWS
-# resources associated with Stevens.  If you have only
-# a default SSH key, then you do not need to include
-# that option here.
-alias instance='aws ec2 run-instances --key-name stevens --output json --image-id'
+alias instance='aws ec2 run-instances --key-name ${AWS_SSH_KEY} --output json --image-id'
 
 # Next, I want my instances to be IPv4/IPv6 dual stack
 # enabled.  AWS does not offer this by default, but if
