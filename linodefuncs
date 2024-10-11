@@ -74,14 +74,21 @@ linID() {
 		return 0
 	fi
 
+	# "Good enough" IPv6 match.
+	if expr "${h}" : "[0-9a-f:/]*$" >/dev/null 2>&1; then
+		licl ls | jq -r ".[] | select(.ipv6 | test(\"^${h}\")) | .id"
+		return 0
+	fi
+
 	if expr "${h}" : "[0-9.]*$" >/dev/null 2>&1; then
 		ip="${h}"
-	elif ! expr "${h}" : "[0-9.-]*.ip.linodeusercontent.com" > /dev/null 2>&1; then
-		echo "That doesn't look like a Linode hostname." >&2
+	elif expr "${h}" : "[0-9.-]*.ip.linodeusercontent.com" >/dev/null 2>&1; then
+		ip=$(echo ${h} | sed -e 's/.ip.*//' -e 's/-/./g')
+	else
+		echo "That doesn't look like a Linode hostname or an IP." >&2
 		return 1
 	fi
 
-	ip=$(echo ${h} | sed -e 's/.ip.*//' -e 's/-/./g')
 	licl ls --ipv4 "${ip}" | jq -r '.[].id'
 }
 
@@ -102,6 +109,20 @@ linIPs() {
 		query=".[].ipv6"
 	fi
 
+	if ! expr "${id}" : "[0-9]*$" >/dev/null 2>&1; then
+		# "Good enough" IPv6 match.
+		if expr "${id}" : "[0-9a-f:/]*$" >/dev/null 2>&1; then
+			query="$(echo "${query}" | sed -e 's/\.\[\]\./\./g')"
+			licl ls | jq -r ".[] | select(.ipv6 | test(\"^${id}\")) | ${query}"
+			return 0
+		fi
+
+		id=$(linID "${id}")
+		if [ $? -gt 0 ]; then
+			return 1
+		fi
+	fi
+
 	licl view $id | jq -r "${query}"
 }
 
@@ -115,7 +136,7 @@ linHostname() {
 		return 0
 	fi
 	
-	if ! expr "${id_or_ip}" : "[0-9.]*" > /dev/null 2>&1; then
+	if ! expr "${id_or_ip}" : "[0-9a-f./]*" > /dev/null 2>&1; then
 		echo "That doesn't look like an IP or ID." >&2
 		return 1
 	fi
@@ -149,7 +170,7 @@ linSummary() {
 		ids="${h}"
 	elif expr "${arg}" : "[a-z]*$" >/dev/null 2>&1; then
 		ids=$(linstances "${arg}")
-	elif expr "${arg}" : "[0-9.-]*.ip.linodeusercontent.com" > /dev/null 2>&1; then
+	else
 		ids="$(linID "${arg}")"
 	fi
 
@@ -157,10 +178,12 @@ linSummary() {
 		licl ls --id "${l}" | jq -r '.[] |
 "ID      : \(.id)
 Label   : \(.label)
-Status  : \(.status)
-Created : \(.created)
 Image   : \(.image)
-Region  : \(.region)"'
+Created : \(.created)
+Status  : \(.status)
+Region  : \(.region)
+IPv6    : \(.ipv6)
+IPv4    : \(.ipv4[])"'
 		echo "Hostname: $(linHostname ${l})"
 		echo
 	done
