@@ -179,7 +179,7 @@ alias running='_aedi --query Reservations[*].Instances[*].[InstanceId] --filters
 alias running-names='_aedi --query Reservations[*].Instances[*].[PublicDnsName] --filter Name=instance-state-name,Values=running | jq -r ".[] | .[] | .[]"'
 
 # To get a listing of hostnames with instance-ids:
-alias instance-id-and-names='_aedi | jq -r ".Reservations[].Instances[] | \"\(.PublicDnsName) \(.InstanceId)\""'
+alias instance-id-and-names='_aedi | jq -r ".Reservations[].Instances[] | (if .PublicDnsName != \"\" then \"\(.PublicDnsName) \" else \"\" end) + .InstanceId"'
 
 # When you want to kill all instances instead of going
 # one-by-one.  We don't pipe into 'termInstance'
@@ -462,34 +462,34 @@ awsS3Usage() {
 # https://wiki.debian.org/Cloud/AmazonEC2Image/
 # Log in as "admin".
 # Debian 12 ("Bookworm") amd64
-alias start-debian='launchInstance ami-0e365edd3d30d031b'
+alias aws-debian='launchInstance ami-0e365edd3d30d031b'
 
 # https://omniosce.org/setup/aws
 # needs t3.micro; log in as "omnios"
-alias start-omnios='launchInstance ami-0669dd7b1ff900fcc'
+alias aws-omnios='launchInstance ami-0669dd7b1ff900fcc'
 
 # https://alt.fedoraproject.org/cloud/
 # Log in as "fedora".
-#alias start-fedora='launchInstance ami-08b4ee602f76bff79'
+#alias aws-fedora='launchInstance ami-08b4ee602f76bff79'
 # Fedora Cloud 39
-alias start-fedora='launchInstance ami-0746fc234df9c1ee0'
+alias aws-fedora='launchInstance ami-0746fc234df9c1ee0'
 
 # https://cloud-images.ubuntu.com/locator/ec2/
 # Log in as "ubuntu". 
 # 16.04 LTS
-alias start-ubuntu='launchInstance ami-0b0ea68c435eb488d'
+alias aws-ubuntu='launchInstance ami-0b0ea68c435eb488d'
 
 # https://www.freebsd.org/releases/
 # Log in as "ec2-user".
 # 13.2R
-alias start-freebsd='launchInstance ami-0fe92206920260384'
+alias aws-freebsd='launchInstance ami-0fe92206920260384'
 
 # https://mail-index.netbsd.org/netbsd-users/2021/01/22/msg026460.html
 # https://stevens.netmeister.org/615/netbsd-amis.html
 # Log in as "root":
-#alias start-netbsd='launchInstance ami-08b87fed21cce91cb t4g.nano'
+#alias aws-netbsd='launchInstance ami-08b87fed21cce91cb t4g.nano'
 # Log in as "ec2-user":
-alias start-netbsd='launchInstance ami-01eeb2af939d69edd t4g.nano'
-alias start-netbsd-arm='start-netbsd'
+alias aws-netbsd='launchInstance ami-01eeb2af939d69edd t4g.nano'
+alias aws-netbsd-arm='aws-netbsd'
 # Log in as "ec2-user":
-alias start-netbsd-amd64='launchInstance ami-0999f80a08a9de4cc'
+alias aws-netbsd-amd64='launchInstance ami-0999f80a08a9de4cc'
