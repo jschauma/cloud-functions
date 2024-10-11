@@ -345,6 +345,14 @@ awsListResources() {
 
 	local valid="amis snapshots instances s3 volumes"
 
+	for v in ${valid}; do
+		if [ x"${regions}" = x"${v}" ]; then
+			which="${regions}"
+			regions=""
+			break
+		fi
+	done
+
 	if [ x"${which}" != x"all" ]; then
 		for resource in ${valid}; do
 			if [ x"${which}" = x"${resource}" ]; then
