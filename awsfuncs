@@ -9,6 +9,13 @@
 # The name of your preferred SSH key for use with AWS.
 AWS_SSH_KEY="${AWS_SSH_KEY:-aws}"
 
+# Default instance type.  Note: some AMIs require
+# specific types, e.g., our NetBSD/amd64 instance
+# won't launch on a t2 instance because it assumes the
+# Nano architecture, and the NetBSD/arm instance uses
+# a t4 instance.
+DEFAULT_INSTANCE_TYPE="t3.micro"
+
 _tout=$(which timeout 2>/dev/null)
 if [ -z "${_tout}" ]; then
 	timeout() { perl -e 'alarm shift; exec @ARGV' "$@"; }
@@ -32,7 +39,7 @@ alias instance='aws ec2 run-instances --key-name ${AWS_SSH_KEY} --output json --
 # because we are passing arguments.
 launchInstance() {
 	local ami=${1}
-	local itype=${2:-"t3.micro"}
+	local itype=${2:-"${DEFAULT_INSTANCE_TYPE}"}
 	
 	subnet=$(aws ec2 describe-subnets --output json | jq -r '.Subnets[] | select( .Tags[]? | select(.Value == "dualstack")).SubnetId')
 	sg=$(aws ec2 describe-security-groups --output json | jq -r '.SecurityGroups [] | select( .GroupName == "dualstack").GroupId')
@@ -97,7 +104,7 @@ ec2wait() {
 			sleep=120
 			user="omnios"
 		elif expr "${descr}" : "FreeBSD" >/dev/null 2>&1 ; then
-			sleep=140
+			sleep=800
 			user="ec2-user"
 		elif expr "${descr}" : "Debian" >/dev/null 2>&1 ; then
 			user="admin"
@@ -132,6 +139,9 @@ ec2wait() {
 
 	if ! ping -q -c 1 "${hostname}" >/dev/null 2>&1 ; then
 		echo "${hostname} still not up, sorry." 2>&1
+		return 1
+	elif ! sshCheck "${hostname}"; then
+		echo "${hostname} ssh check failed." 2>&1
 		return 1
 	else
 		echo "Ready."
@@ -173,10 +183,10 @@ alias inames='_aedi | jq -r ".Reservations[].Instances[].PublicDnsName" | grep .
 
 # ...but often we only care about which instances are
 # currently running:
-alias running='_aedi --query Reservations[*].Instances[*].[InstanceId] --filters Name=instance-state-name,Values=running | jq -r ".[] | .[] | .[]"'
+alias running='_aedi --query "Reservations[*].Instances[*].[InstanceId]" --filters Name=instance-state-name,Values=running | jq -r ".[] | .[] | .[]"'
 
 # Same thing, but printing hostnames instead:
-alias running-names='_aedi --query Reservations[*].Instances[*].[PublicDnsName] --filter Name=instance-state-name,Values=running | jq -r ".[] | .[] | .[]"'
+alias running-names='_aedi --query "Reservations[*].Instances[*].[PublicDnsName]" --filter Name=instance-state-name,Values=running | jq -r ".[] | .[] | .[]"'
 
 # To get a listing of hostnames with instance-ids:
 alias instance-id-and-names='_aedi | jq -r ".Reservations[].Instances[] | (if .PublicDnsName != \"\" then \"\(.PublicDnsName) \" else \"\" end) + .InstanceId"'
@@ -479,8 +489,8 @@ alias aws-omnios='launchInstance ami-0669dd7b1ff900fcc'
 # https://alt.fedoraproject.org/cloud/
 # Log in as "fedora".
 #alias aws-fedora='launchInstance ami-08b4ee602f76bff79'
-# Fedora Cloud 39
-alias aws-fedora='launchInstance ami-0746fc234df9c1ee0'
+# Fedora Cloud 41
+alias aws-fedora='launchInstance ami-046a6af96ef510bb6'
 
 # https://cloud-images.ubuntu.com/locator/ec2/
 # Log in as "ubuntu". 
@@ -489,8 +499,8 @@ alias aws-ubuntu='launchInstance ami-0b0ea68c435eb488d'
 
 # https://www.freebsd.org/releases/
 # Log in as "ec2-user".
-# 13.2R
-alias aws-freebsd='launchInstance ami-0fe92206920260384'
+# 14.1R
+alias aws-freebsd='launchInstance ami-0f4666775a3db993d'
 
 # https://mail-index.netbsd.org/netbsd-users/2021/01/22/msg026460.html
 # https://stevens.netmeister.org/615/netbsd-amis.html
