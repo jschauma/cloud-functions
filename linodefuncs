@@ -58,7 +58,7 @@ launchLinode() {
 	linstance --image "${image}"				\
 		--region "${region}"				\
 		--type "${type}" 				\
-		--label "${image##*/}-${region}"        	\
+		--label "${image##*/}-${region}-$(date +%s)"	\
 		--no-defaults 					\
 		--metadata.user_data "$(cloudInitData)" |	\
 		jq -r '.[].id'
