@@ -58,7 +58,7 @@ launchLinode() {
 	linstance --image "${image}"				\
 		--region "${region}"				\
 		--type "${type}" 				\
-		--label "${image##*/}-${region}-$(date +%s)"	\
+		--label "${image##*/}-${region}-$(date +%s)"    \
 		--no-defaults 					\
 		--metadata.user_data "$(cloudInitData)" |	\
 		jq -r '.[].id'
@@ -280,6 +280,36 @@ linwait() {
 	else
 		echo "Ready."
 	fi
+}
+
+lish() {
+	local arg="${1}"
+	local id=""
+	local region_label=""
+
+	if [ -z "${arg}" ] || [ -n "${2:-""}" ] ||
+		[ x"${arg}" = x"-h" ] ; then
+		echo "Usage: lish <ip|id|hostname>" >&2
+		return 0
+	fi
+
+	if expr "${arg}" : "[0-9]*$" >/dev/null 2>&1; then
+		id="${arg}"
+	else
+		id="$(linID "${arg}")"
+	fi
+
+	if [ -z "${id}" ]; then
+		return 1
+	fi
+
+	region_label="$(licl ls --id "${id}" | jq -r '.[] | "\(.region) \(.label)"')"
+	if [ -z "${region_label}" ]; then
+		echo "Unable to determine region/label for ${id}." >&2
+		return 1
+	fi
+
+	ssh -t "lish-${region_label% *}.linode.com" "${region_label##* }"
 }
 
 # Try to determine when SSH is up and running.
