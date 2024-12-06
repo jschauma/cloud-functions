@@ -160,7 +160,7 @@ linSummary() {
 
 	if [ x"${arg}" = x"-h" ]; then
 		echo "linSummary - list Linode instance text summary" >&2
-		echo "Usage: linSummary [<status>|<hostname>|<id>]"
+		echo "Usage: linSummary [<status>|<hostname>|<id>]" >&2
 		return 0
 	fi
 
