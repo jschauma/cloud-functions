@@ -193,6 +193,24 @@ IPv4    : \(.ipv4[])"'
 	done
 }
 
+linVolume() {
+	local size="${1:-10}"
+	local region="${2:-${LINODE_DEFAULT_REGION}}"
+	local label="${3:-"${region}-$(date +%s)"}"
+
+	if [ x"${size}" = x"-h" ]; then
+		echo "Usage: linVolume [size in GB] [region] [label]" >&2
+		echo "       default: ${size}, ${region}, ${label}"
+		return 0
+	fi
+
+	linode-cli --json --no-defaults			\
+		volumes create --label "${label}"	\
+				--size "${size}"	\
+				--region "${region}" |	\
+		jq '.[].id'
+}
+
 # List selected hostnames.
 linnames() {
 	local status="${1:-""}"
