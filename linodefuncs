@@ -9,6 +9,9 @@
 # The name of your default SSH key for use with Linode
 LINODE_SSH_KEY="${LINODE_SSH_KEY:-linode}"
 
+# Your preferred region
+LINODE_DEFAULT_REGION="${LINODE_DEFAULT_REGION:-us-east}"
+
 _tout=$(which timeout 2>/dev/null)
 if [ -z "${_tout}" ]; then
 	timeout() { perl -e 'alarm shift; exec @ARGV' "$@"; }
@@ -52,7 +55,7 @@ alias linstance='licl create --authorized_users ${USER} --private_ip false --roo
 
 launchLinode() {
 	local image="${1:-linode/debian12}"
-	local region="${2:-us-ord}"
+	local region="${2:-${LINODE_DEFAULT_REGION}}"
 	local type="${3:-g6-nanode-1}"
 
 	linstance --image "${image}"				\
