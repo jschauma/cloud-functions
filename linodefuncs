@@ -194,18 +194,40 @@ IPv4    : \(.ipv4[])"'
 }
 
 linVolume() {
-	local size="${1:-10}"
-	local region="${2:-${LINODE_DEFAULT_REGION}}"
-	local label="${3:-"${region}-$(date +%s)"}"
+	local args
+	local size=10
+	local region="${LINODE_DEFAULT_REGION}"
+	local label="${region}-$(date +%s)"
+	local linarg=""
 
-	if [ x"${size}" = x"-h" ]; then
-		echo "Usage: linVolume [size in GB] [region] [label]" >&2
-		echo "       default: ${size}, ${region}, ${label}"
-		return 0
-	fi
+	args=$(getopt "hl:r:s:" $*)
+	set -- ${args}
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			-h)
+				echo "Usage: linVolume [-h] [-l linodeID] [-r region] [-s size-in-GB] " >&2
+				echo "       defaults: size: 10, region: ${region}"
+				return 0
+			;;
+			-l)
+				linarg="--linode_id $2"
+				shift
+			;;
+			-r)
+				region=$2
+				shift
+			;;
+			-s)
+				size=$2
+				shift
+			;;
+		esac
+		shift
+	done
 
 	linode-cli --json --no-defaults			\
 		volumes create --label "${label}"	\
+				${linarg}		\
 				--size "${size}"	\
 				--region "${region}" |	\
 		jq '.[].id'
@@ -249,7 +271,7 @@ linstances() {
 linwait() {
 	local ips ip n status
 	local id="${1}"
-	local sleep=60
+	local sleep=120
 
 	if ! expr "${1}" : "[0-9]*$" >/dev/null 2>&1; then
 		echo "That doesn't look like a Linode ID." >&2
