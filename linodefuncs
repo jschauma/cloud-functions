@@ -177,6 +177,11 @@ linSummary() {
 		ids="$(linID "${arg}")"
 	fi
 
+	if [ -n "${ids}" ]; then
+		echo "You have the following Linodes:"
+		echo
+	fi
+
 	for l in ${ids}; do
 		licl ls --id "${l}" | jq -r '.[] |
 "ID      : \(.id)
@@ -191,6 +196,13 @@ IPv4    : \(.ipv4[])"'
 		echo "Hostname: $(linHostname ${l})"
 		echo
 	done
+
+	ids="$(linode-cli --json volumes ls | jq -r '.[].id')"
+	if [ -n "${ids}" ]; then
+		echo "You have the following Volumes:"
+		echo
+		linode-cli --ascii-table volumes ls
+	fi
 }
 
 linVolume() {
