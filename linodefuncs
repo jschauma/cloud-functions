@@ -337,14 +337,14 @@ linwait() {
 	fi
 }
 
-lish() {
+lishArgs() {
 	local arg="${1}"
 	local id=""
 	local region_label=""
 
 	if [ -z "${arg}" ] || [ -n "${2:-""}" ] ||
 		[ x"${arg}" = x"-h" ] ; then
-		echo "Usage: lish <ip|id|hostname>" >&2
+		echo "Usage: lishArgs <ip|id|hostname>" >&2
 		return 0
 	fi
 
@@ -364,7 +364,42 @@ lish() {
 		return 1
 	fi
 
+	echo "${region_label}"
+}
+
+lish() {
+	local arg="${1}"
+	local region_label=""
+
+	if [ -z "${arg}" ] || [ -n "${2:-""}" ] ||
+		[ x"${arg}" = x"-h" ] ; then
+		echo "Usage: lish <ip|id|hostname>" >&2
+		return 0
+	fi
+
+	region_label="$(lishArgs ${arg})"
+
 	ssh -t "lish-${region_label% *}.linode.com" "${region_label##* }"
+}
+
+linSSHFP() {
+	local arg="${1}"
+	local fptype="${2:-"."}"
+	local region_label=""
+
+	if [ -z "${arg}" ] || [ x"${arg}" = x"-h" ] ; then
+		echo "Usage: linSSHFP <ip|id|hostname>" >&2
+		return 0
+	fi
+
+	region_label="$(lishArgs ${arg})"
+	fptype="$(echo "${fptype}" | tr '[A-Z]' '[a-z]')"
+
+	ssh "lish-${region_label% *}.linode.com" "${region_label##* } logview" | \
+		sed -n '/^-----BEGIN SSH/,/-----END/{/^-----BEGIN SSH/!{/-----END/!p;};}' | \
+		grep "${fptype}" | 		\
+		tr -d '' | 			\
+		ssh-keygen -l -f /dev/stdin
 }
 
 # Try to determine when SSH is up and running.
