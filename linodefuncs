@@ -5,6 +5,10 @@
 #         @jschauma@mstdn.social
 #
 # This file is in the public domain.
+#
+# Note: make sure you have your Linode CLI environment
+# set up:
+# https://techdocs.akamai.com/cloud-computing/docs/install-and-configure-the-cli
 
 # The name of your default SSH key for use with Linode
 LINODE_SSH_KEY="${LINODE_SSH_KEY:-linode}"
