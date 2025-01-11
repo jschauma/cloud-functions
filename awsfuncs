@@ -481,6 +481,7 @@ awsS3Usage() {
 # Log in as "admin".
 # Debian 12 ("Bookworm") amd64
 alias aws-debian='launchInstance ami-0e365edd3d30d031b'
+alias aws-debian-arm'launchInstance ami-05f07c48a4fe2af3a t4g.nano'
 
 # https://omniosce.org/setup/aws
 # needs t3.micro; log in as "omnios"
