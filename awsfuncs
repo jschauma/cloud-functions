@@ -109,7 +109,7 @@ ec2wait() {
 		elif expr "${descr}" : "Debian" >/dev/null 2>&1 ; then
 			user="admin"
 		elif expr "${descr}" : "Fedora" >/dev/null 2>&1 ; then
-			user="fedora"
+			user="core"
 		elif expr "${descr}" : "Canonical" >/dev/null 2>&1 ; then
 			user="ubuntu"
 		elif expr "${descr}" : "NetBSD.*10.0" >/dev/null 2>&1 ; then
@@ -233,7 +233,8 @@ console() {
 }
 
 termInstance() {
-	_instanceOperation terminate-instances "${1}"
+	_instanceOperation terminate-instances "${1}" | \
+		jq -r '.TerminatingInstances[0].CurrentState.Name'
 }
 
 startInstance() {
@@ -480,18 +481,18 @@ awsS3Usage() {
 # https://wiki.debian.org/Cloud/AmazonEC2Image/
 # Log in as "admin".
 # Debian 12 ("Bookworm") amd64
-alias aws-debian='launchInstance ami-0e365edd3d30d031b'
-alias aws-debian-arm='launchInstance ami-05f07c48a4fe2af3a t4g.nano'
+alias aws-debian='launchInstance ami-0e8087266e36fe754'
+alias aws-debian-arm='launchInstance ami-ami-0be11dbb16042109e t4g.nano'
 
 # https://omniosce.org/setup/aws
+# r151044
 # needs t3.micro; log in as "omnios"
 alias aws-omnios='launchInstance ami-0669dd7b1ff900fcc'
 
-# https://alt.fedoraproject.org/cloud/
-# Log in as "fedora".
-#alias aws-fedora='launchInstance ami-08b4ee602f76bff79'
+# https://fedoraproject.org/coreos/download?stream=stable
+# Log in as "core".
 # Fedora Cloud 41
-alias aws-fedora='launchInstance ami-046a6af96ef510bb6'
+alias aws-fedora='launchInstance ami-062e91802cc9291d2'
 
 # https://cloud-images.ubuntu.com/locator/ec2/
 # Log in as "ubuntu". 
@@ -499,9 +500,13 @@ alias aws-fedora='launchInstance ami-046a6af96ef510bb6'
 alias aws-ubuntu='launchInstance ami-0b0ea68c435eb488d'
 
 # https://www.freebsd.org/releases/
+# To find AMI ID:
+# - Follow link to AWS Marketplace
+# - View Purchase Options
+# - Continue to Configuration
 # Log in as "ec2-user".
-# 14.1R
-alias aws-freebsd='launchInstance ami-0f4666775a3db993d'
+# 14.2R (ZFS)
+alias aws-freebsd='launchInstance ami-04aa0233c96daa209'
 
 # https://mail-index.netbsd.org/netbsd-users/2021/01/22/msg026460.html
 # https://stevens.netmeister.org/615/netbsd-amis.html
