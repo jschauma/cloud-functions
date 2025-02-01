@@ -228,6 +228,34 @@ _instanceOperation() {
 	eval aws ec2 ${op} --output ${out} ${arg} "${hname}"
 }
 
+awsStatus() {
+	local id=""
+	local hname=""
+	local status=""
+
+	if [ x"${1}" = x"-h" ]; then
+		echo "Supported arguments: <hostname|id>" >&2
+		echo "Output: <id> <hostname> <status>" >&2
+		return 0
+	fi
+
+	for i in $@; do
+		if expr "${i}" : "ec2-" >/dev/null 2>&1 ; then
+			hname="${i}"
+			id="$(instanceId ${i})"
+		elif expr "${i}" : "i-" >/dev/null 2>&1 ; then
+			hname="$(iname ${i})"
+			id="${i}"
+		else
+			echo "<hostname|id> should match 'ec2-*' or 'i-*'" >&2
+			continue
+		fi
+		status=$(_instanceOperation describe-instances "${id}" | \
+			jq -r '.Reservations[].Instances[].State.Name')
+		echo "${id} ${hname:-<none>} ${status}"
+	done
+}
+
 console() {
 	_instanceOperation get-console-output "${1}"
 }
