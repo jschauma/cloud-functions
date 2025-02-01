@@ -88,7 +88,7 @@ ec2wait() {
 		echo "That doesn't look like an instance ID." >&2
 		return 1;
 	fi
-	timeout 60 "aws ec2 wait instance-running --output json --instance-ids $@" 2>/dev/null
+	timeout 60 aws ec2 wait instance-running --output json --instance-ids $@ 2>/dev/null
 	if [ $? -gt 0 ]; then
 		echo "Instance terminated or not in running state or still pending after 60 seconds, giving up." 2>&1
 		return 1;
