@@ -482,7 +482,9 @@ awsS3Usage() {
 # Log in as "admin".
 # Debian 12 ("Bookworm") amd64
 alias aws-debian='launchInstance ami-0e8087266e36fe754'
-alias aws-debian-arm='launchInstance ami-ami-0be11dbb16042109e t4g.nano'
+# t4g.small instances are in the Free Tier until 2025-12-31
+# https://aws.amazon.com/ec2/faqs/#t4g-instances
+alias aws-debian-arm='launchInstance ami-ami-0be11dbb16042109e t4g.small'
 
 # https://omniosce.org/setup/aws
 # r151044
@@ -512,8 +514,10 @@ alias aws-freebsd='launchInstance ami-04aa0233c96daa209'
 # https://stevens.netmeister.org/615/netbsd-amis.html
 # Log in as "root":
 #alias aws-netbsd='launchInstance ami-08b87fed21cce91cb t4g.nano'
+# t4g.small instances are in the Free Tier until 2025-12-31
+# https://aws.amazon.com/ec2/faqs/#t4g-instances
 # Log in as "ec2-user":
-alias aws-netbsd='launchInstance ami-01eeb2af939d69edd t4g.nano'
+alias aws-netbsd='launchInstance ami-01eeb2af939d69edd t4g.small'
 alias aws-netbsd-arm='aws-netbsd'
 # Log in as "ec2-user":
 alias aws-netbsd-amd64='launchInstance ami-0999f80a08a9de4cc'
