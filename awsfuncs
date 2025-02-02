@@ -82,6 +82,7 @@ instanceId() {
 ec2wait() {
 	local ami descr hostname n
 	local user="root"
+	local os=""
 	local sleep=60
 
 	if ! expr "$@" : ".*i-[0-9a-f]*" >/dev/null 2>&1; then
@@ -96,26 +97,31 @@ ec2wait() {
 
 	# "running" does not mean SSH is up, so give it a bit more time,
 	# guessing different time intervals for different OS versions
-	ami=$(_aedi  --instance-ids "$@" | jq -r '.Reservations[0].Instances[0].ImageId')
-	if [ -n "${ami}" ]; then
-		descr=$(aws ec2 describe-images --image-id "${ami}" |
-			jq -r '.Images[0].Description')
-		if expr "${descr}" : "OmniOS" >/dev/null 2>&1 ; then
+	os=$(ec2getOS "$@")
+
+	case "${os}" in
+		omnios)
 			sleep=120
 			user="omnios"
-		elif expr "${descr}" : "FreeBSD" >/dev/null 2>&1 ; then
+		;;
+		freebsd)
 			sleep=800
 			user="ec2-user"
-		elif expr "${descr}" : "Debian" >/dev/null 2>&1 ; then
+		;;
+		debian)
 			user="admin"
-		elif expr "${descr}" : "Fedora" >/dev/null 2>&1 ; then
+		;;
+		fedora)
 			user="core"
-		elif expr "${descr}" : "Canonical" >/dev/null 2>&1 ; then
+		;;
+		ubuntu)
 			user="ubuntu"
-		elif expr "${descr}" : "NetBSD.*10.0" >/dev/null 2>&1 ; then
+		;;
+		netbsd)
 			user="ec2-user"
-		fi
-	fi
+		;;
+	esac
+
 	echo "$@"
 	hostname=$(iname $@)
 	echo "${hostname}"
@@ -148,8 +154,47 @@ ec2wait() {
 	fi
 }
 
+ec2getOS() {
+	local input="${1}"
+	local id_and_name=""
+	local id=""
+	local hname=""
+
+	if [ x"${input}" = x"-h" ]; then
+		echo "Supported arguments: <hostname|id>" >&2
+		return 0
+	fi
+
+	id_and_name="$(_id_and_name ${input})"
+	if [ -z "${id_and_name}" ]; then
+		echo "Invalid input." >&2
+		return 0
+	fi
+	id="${id_and_name%% *}"
+
+	ami=$(_aedi  --instance-ids "${id}" | jq -r '.Reservations[0].Instances[0].ImageId')
+	if [ -n "${ami}" ]; then
+		descr=$(aws ec2 describe-images --image-id "${ami}" |
+			jq -r '.Images[0].Description')
+		if expr "${descr}" : "OmniOS" >/dev/null 2>&1 ; then
+			echo "omnios"
+		elif expr "${descr}" : "FreeBSD" >/dev/null 2>&1 ; then
+			echo "freebsd"
+		elif expr "${descr}" : "Debian" >/dev/null 2>&1 ; then
+			echo "debian"
+		elif expr "${descr}" : "Fedora" >/dev/null 2>&1 ; then
+			echo "fedora"
+		elif expr "${descr}" : "Canonical" >/dev/null 2>&1 ; then
+			echo "ubuntu"
+		elif expr "${descr}" : "NetBSD.*10.0" >/dev/null 2>&1 ; then
+			echo "netbsd"
+		fi
+	fi
+}
+
 sshCheck() {
 	local hname="${1}"
+
 	if [ x"${hname}" = x"-h" ]; then
 		echo "Supported arguments: <hostname|id>" >&2
 		return 0
@@ -228,31 +273,55 @@ _instanceOperation() {
 	eval aws ec2 ${op} --output ${out} ${arg} "${hname}"
 }
 
-awsStatus() {
+
+_id_and_name() {
+	local input="${1}"
+	local hname=""
+	local id=""
+
+	if expr "${input}" : "ec2-" >/dev/null 2>&1 ; then
+		hname="${input}"
+		id="$(instanceId ${input})"
+	elif expr "${input}" : "i-" >/dev/null 2>&1 ; then
+		hname="$(iname ${input})"
+		id="${input}"
+	else
+		echo "<hostname|id> should match 'ec2-*' or 'i-*'" >&2
+		return
+	fi
+
+	echo "${id} ${hname}"
+}
+
+instanceStatus() {
+	local id_and_name=""
 	local id=""
 	local hname=""
+	local os=""
 	local status=""
+	local args="$@"
 
 	if [ x"${1}" = x"-h" ]; then
 		echo "Supported arguments: <hostname|id>" >&2
-		echo "Output: <id> <hostname> <status>" >&2
+		echo "Output: <id> <hostname> <os> <status>" >&2
 		return 0
 	fi
 
-	for i in $@; do
-		if expr "${i}" : "ec2-" >/dev/null 2>&1 ; then
-			hname="${i}"
-			id="$(instanceId ${i})"
-		elif expr "${i}" : "i-" >/dev/null 2>&1 ; then
-			hname="$(iname ${i})"
-			id="${i}"
-		else
-			echo "<hostname|id> should match 'ec2-*' or 'i-*'" >&2
+	if [ -z "${args}" ]; then
+		args="$(instances)"
+	fi
+
+	for i in ${args}; do
+		id_and_name="$(_id_and_name ${i})"
+		if [ -z "${id_and_name}" ]; then
 			continue
 		fi
+		hname="${id_and_name##* }"
+		id="${id_and_name%% *}"
 		status=$(_instanceOperation describe-instances "${id}" | \
 			jq -r '.Reservations[].Instances[].State.Name')
-		echo "${id} ${hname:-<none>} ${status}"
+		os=$(ec2getOS ${id})
+		echo "${id} ${hname:-<none>} ${os:-<none>} ${status}"
 	done
 }
 
@@ -296,34 +365,69 @@ protectІnstance() {
 # Create a new volume of size 1GB in us-east-1a unless
 # specified otherwise, e.g., "newVolume 3 us-west-1"
 newVolume() {
-	if [ x"${1}" = x"-h" ]; then
-		echo "Usage: newVolume [size in GB] [availability-zone]"
+	local instance=""
+	local volume=""
+
+	if [ x"${1}" = x"-i" ]; then
+		instance="${2:-none}"
+		shift
+		shift
+	fi
+
+	if [ x"${1}" = x"-h" ] || [ x"${instance}" = x"none" ]; then
+		echo "Usage: newVolume [-i instanceID] [size in GB] [availability-zone]"
 		echo "       default: 1, us-east-1a"
 		return 0
 	fi
-	aws ec2 create-volume --output json --size "${1:-1}" --availability-zone "${2:-us-east-1a}" | \
-		jq -r ".VolumeId"
+
+	volume=$(aws ec2 create-volume --output json --size "${1:-1}" --availability-zone "${2:-us-east-1a}" | \
+		jq -r ".VolumeId")
+	echo "${volume}"
+	if [ -n "${instance}" ]; then
+		echo "Attaching ${volume} to ${instance}..."
+		sleep 2
+		attachVolume ${volume} ${instance} >/dev/null
+	fi
 }
 
 # We often attach just one volume to a given instance,
 # so let's have a default function to save ourselves
 # some typing.
 attachVolume() {
-	if [ x"${1}" = x"-h" ]; then
+	local volume="${1}"
+	local instance="${2}"
+	local device="${3}"
+	local used=""
+	local base=101 # decimal 101 == 'e'
+
+	if [ x"${1}" = x"-h" ] || [ -z "${volume}" ]; then
 		echo "Usage: attachVolume volume-id instance-id [device]"
 		echo "       default device: /dev/sdf"
 		return 0
 	fi
-	if [ -z "${2}" ]; then
+	if [ -z "${instance}" ]; then
 		echo "Usage: attachVolume vol-id instance-id [device]" >&2
 		return 1
 	fi
-	aws ec2 attach-volume --output json --volume-id "${1}" --instance-id "${2}" --device "${3:-/dev/sdf}"
+	if [ -z "${device}" ]; then
+		# We determine the '/dev/...' to use by counting the attached
+		# disks 'incrementing' the letter starting from 'f' (e + 1 if
+		# there's only one root disk).
+		used=$(aws ec2 describe-volumes --filters Name=attachment.instance-id,Values=${instance} | \
+			jq -r '[.Volumes[].Attachments[].Device] | length')
+		device="/dev/sd"$(printf "\\$(printf '%03o' $((${base} + ${used})))")
+	fi
+	aws ec2 attach-volume --output json --volume-id "${1}" --instance-id "${instance}" --device "${device}"
 }
 
 # Same for detachingk, but we don't need to know the
 # instance-id:
 detachVolume() {
+	local force=""
+	if [ x"${1}" = x"-f" ]; then
+		force="--force"
+		shift
+	fi
 	if [ -z "${1}" ]; then
 		echo "Usage: detachVolume vol-id" >&2
 		return 1
@@ -334,11 +438,13 @@ detachVolume() {
 		echo "Volume ${1} not attached to any instance?" >&2
 		return
 	fi
-	aws ec2 detach-volume --output json --volume-id "${1}" --instance-id "${instance}" 
+	aws ec2 detach-volume --output json --volume-id "${1}" --instance-id "${instance}" ${force}
 }
 
-# Like 'instances', but for EBS volumes:
-alias volumes='aws ec2 describe-volumes --output json | jq -r ".Volumes[].VolumeId"'
+ec2volumes() {
+	aws ec2 describe-volumes --output json | \
+		jq -r '.Volumes[] | "\(.VolumeId) \(.Attachments[0].InstanceId // "not attached")"'
+}
 
 # Like 'termInstance', but for a single EBS volume:
 alias del-volume='aws ec2 delete-volume --volume-id'
