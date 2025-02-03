@@ -466,6 +466,7 @@ ec2deleteVolumes() {
 	fi
 
 	for v in ${volumes}; do
+		echo "Deleting volume ${v}..."
 		del-volume ${v}
 	done
 }
