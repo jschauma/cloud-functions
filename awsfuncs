@@ -18,43 +18,63 @@ DEFAULT_INSTANCE_TYPE="t3.micro"
 
 _tout=$(which timeout 2>/dev/null)
 if [ -z "${_tout}" ]; then
-	timeout() { perl -e 'alarm shift; exec @ARGV' "$@"; }
+    timeout() { perl -e 'alarm shift; exec @ARGV' "$@"; }
 fi
 
 ###
 # Aliases first, so we can use them in the functions below.
 ###
+_aedi() {
+    aws ec2 describe-instances --output json "$@"
+}
 
-alias _aedi='aws ec2 describe-instances --output json'
-alias instance='aws ec2 run-instances --key-name ${AWS_SSH_KEY} --output json --image-id'
+instance() {
+    aws ec2 run-instances --key-name "${AWS_SSH_KEY}" --output json --image-id "$@"
+}
 
 # Like 'termInstance', but for a single EBS volume:
-alias del-volume='aws ec2 delete-volume --volume-id'
+del-volume() {
+    aws ec2 delete-volume --volume-id "$@"
+}
 
 # Like 'killallInstances', but for EBS volumes:
-alias kill-all-volumes='volumes | xargs -n 1 aws ec2 delete-volume --volume-id'
+kill-all-volumes() {
+    volumes | xargs -n 1 aws ec2 delete-volume --volume-id "$@"
+}
 
 # Use this to see which instances you currently
 # have, regardless of their state.
-alias instances='_aedi | jq -r ".Reservations[].Instances[].InstanceId"'
+instances() {
+    _aedi | jq -r ".Reservations[].Instances[].InstanceId"
+}
 
 # Same thing, but printing the hostnames instead:
-alias inames='_aedi | jq -r ".Reservations[].Instances[].PublicDnsName" | grep .'
+inames() {
+    _aedi | jq -r ".Reservations[].Instances[].PublicDnsName" | grep .
+}
 
 # ...but often we only care about which instances are
 # currently running:
-alias running='_aedi --query "Reservations[*].Instances[*].[InstanceId]" --filters Name=instance-state-name,Values=running | jq -r ".[] | .[] | .[]"'
+running() {
+    _aedi --query "Reservations[*].Instances[*].[InstanceId]" --filters Name=instance-state-name,Values=running | jq -r ".[] | .[] | .[]"
+}
 
 # Same thing, but printing hostnames instead:
-alias running-names='_aedi --query "Reservations[*].Instances[*].[PublicDnsName]" --filter Name=instance-state-name,Values=running | jq -r ".[] | .[] | .[]"'
+running-names() {
+    _aedi --query "Reservations[*].Instances[*].[PublicDnsName]" --filter Name=instance-state-name,Values=running | jq -r ".[] | .[] | .[]"
+}
 
 # To get a listing of hostnames with instance-ids:
-alias instance-id-and-names='_aedi | jq -r ".Reservations[].Instances[] | (if .PublicDnsName != \"\" then \"\(.PublicDnsName) \" else \"\" end) + .InstanceId"'
+instance-id-and-names() {
+    _aedi | jq -r ".Reservations[].Instances[] | (if .PublicDnsName != \"\" then \"\(.PublicDnsName) \" else \"\" end) + .InstanceId"
+}
 
 # When you want to kill all instances instead of going
 # one-by-one.  We don't pipe into 'termInstance'
 # because that may not be defined when xargs runs.
-alias kill-all-instances='instances | xargs aws ec2 terminate-instances --instance-ids'
+kill-all-instances () {
+    instances | xargs aws ec2 terminate-instances --instance-ids
+}
 
 # Next, I want my instances to be IPv4/IPv6 dual stack
 # enabled.  AWS does not offer this by default, but if
@@ -66,16 +86,18 @@ alias kill-all-instances='instances | xargs aws ec2 terminate-instances --instan
 # We're using a function instead of an alias here
 # because we are passing arguments.
 launchInstance() {
-	local ami=${1}
-	local itype=${2:-"${DEFAULT_INSTANCE_TYPE}"}
-	
-	subnet=$(aws ec2 describe-subnets --output json | jq -r '.Subnets[] | select( .Tags[]? | select(.Value == "dualstack")).SubnetId')
-	sg=$(aws ec2 describe-security-groups --output json | jq -r '.SecurityGroups [] | select( .GroupName == "dualstack").GroupId')
-	instance ${ami}				\
-		--instance-type ${itype}	\
-		--subnet-id "${subnet}"		\
-		--security-group-ids "${sg}" |	\
-		jq -r '.Instances[].InstanceId'
+    local ami="${1}"
+    local itype="${2:-"${DEFAULT_INSTANCE_TYPE}"}"
+    
+    local subnet
+    subnet="$(aws ec2 describe-subnets --output json | jq -r '.Subnets[] | select( .Tags[]? | select(.Value == "dualstack")).SubnetId')"
+    local sg
+    sg="$(aws ec2 describe-security-groups --output json | jq -r '.SecurityGroups [] | select( .GroupName == "dualstack").GroupId')"
+    instance "${ami}"                   \
+        --instance-type "${itype}"      \
+        --subnet-id "${subnet}"         \
+        --security-group-ids "${sg}" |  \
+        jq -r '.Instances[].InstanceId'
 }
 
 # Often I have an instance-id, but want to know what
@@ -84,284 +106,282 @@ launchInstance() {
 # the hostname back, so use the 'iname' function
 # to get it:
 iname() {
-	_aedi --instance-ids $@ | \
-		jq -r ".Reservations[].Instances[].PublicDnsName"
+    _aedi --instance-ids "$@" | jq -r ".Reservations[].Instances[].PublicDnsName"
 }
 
 # Basically the inverse:  I have an instance name, but
 # I want to get the instance ID.
 instanceId() {
-	local hname="${1}"
-	if [ x"${hname}" = x"-h" ]; then
-		echo "Usage: instanceId <hostname>" >&2
-		return 0
-	fi
-	if ! expr "${hname}" : "ec2-" >/dev/null 2>&1 ; then
-		echo "'${hname}' does not look like an EC2 name to me." >&2
-		return 0
-	fi
-	_aedi --filters Name=dns-name,Values="${hname}" | \
-		jq -r ".Reservations[].Instances[].InstanceId"
+    local hname="${1}"
+    if [ x"${hname}" = x"-h" ]; then
+        echo "Usage: instanceId <hostname>" >&2
+        return 0
+    fi
+    if ! expr "${hname}" : "ec2-" >/dev/null 2>&1 ; then
+        echo "'${hname}' does not look like an EC2 name to me." >&2
+        return 0
+    fi
+    _aedi --filters Name=dns-name,Values="${hname}" | jq -r ".Reservations[].Instances[].InstanceId"
 }
 
 # After we start an instance, we have to wait for it
 # to come up.  Note: this uses the 'iname' function
 # above to report the hostname when we think it's up.
 ec2wait() {
-	local ami descr hostname n
-	local user="root"
-	local os=""
-	local sleep=60
+    local ami descr hostname n
+    local user="root"
+    local os=""
+    local sleep=60
 
-	if ! expr "$@" : ".*i-[0-9a-f]*" >/dev/null 2>&1; then
-		echo "That doesn't look like an instance ID." >&2
-		return 1;
-	fi
-	timeout 60 aws ec2 wait instance-running --output json --instance-ids $@ 2>/dev/null
-	if [ $? -gt 0 ]; then
-		echo "Instance terminated or not in running state or still pending after 60 seconds, giving up." 2>&1
-		return 1;
-	fi
+    if ! expr "$@" : ".*i-[0-9a-f]*" >/dev/null 2>&1; then
+        echo "That doesn't look like an instance ID." >&2
+        return 1;
+    fi
+    timeout 60 aws ec2 wait instance-running --output json --instance-ids "$@" 2>/dev/null
+    if [ "$?" -gt 0 ]; then
+        echo "Instance terminated or not in running state or still pending after 60 seconds, giving up." 2>&1
+        return 1;
+    fi
 
-	# "running" does not mean SSH is up, so give it a bit more time,
-	# guessing different time intervals for different OS versions
-	os=$(ec2getOS "$@")
+    # "running" does not mean SSH is up, so give it a bit more time,
+    # guessing different time intervals for different OS versions
+    os="$(ec2getOS "$@")"
 
-	case "${os}" in
-		omnios)
-			sleep=120
-			user="omnios"
-		;;
-		freebsd)
-			sleep=800
-			user="ec2-user"
-		;;
-		debian)
-			user="admin"
-		;;
-		fedora)
-			user="core"
-		;;
-		ubuntu)
-			user="ubuntu"
-		;;
-		netbsd)
-			user="ec2-user"
-		;;
-	esac
+    case "${os}" in
+        omnios)
+            sleep=120
+            user="omnios"
+        ;;
+        freebsd)
+            sleep=800
+            user="ec2-user"
+        ;;
+        debian)
+            user="admin"
+        ;;
+        fedora)
+            user="core"
+        ;;
+        ubuntu)
+            user="ubuntu"
+        ;;
+        netbsd)
+            user="ec2-user"
+        ;;
+    esac
 
-	echo "$@"
-	hostname=$(iname $@)
-	echo "${hostname}"
-	echo "${user}"
-	echo
+    echo "$@"
+    hostname="$(iname "$@")"
+    echo "${hostname}"
+    echo "${user}"
+    echo
 
-	if ! sshCheck "${hostname}" ; then
-		echo "Sleeping up to ${sleep} seconds to wait for ssh:"
+    if ! sshCheck "${hostname}" ; then
+        echo "Sleeping up to ${sleep} seconds to wait for ssh:"
 
-		n=5
-		while [ ${n} -lt ${sleep} ]; do
-			/bin/echo -n "."
-			sleep 5
-			n=$(( n + 5 ))
-			if sshCheck "${hostname}"; then
-				break
-			fi
-		done
-		echo
-	fi
+        n=5
+        while [ "${n}" -lt "${sleep}" ]; do
+            /bin/echo -n "."
+            sleep 5
+            n=$(( n + 5 ))
+            if sshCheck "${hostname}"; then
+                break
+            fi
+        done
+        echo
+    fi
 
-	if ! ping -q -c 1 "${hostname}" >/dev/null 2>&1 ; then
-		echo "${hostname} still not up, sorry." 2>&1
-		return 1
-	elif ! sshCheck "${hostname}"; then
-		echo "${hostname} ssh check failed." 2>&1
-		return 1
-	else
-		echo "Ready."
-	fi
+    if ! ping -q -c 1 "${hostname}" >/dev/null 2>&1 ; then
+        echo "${hostname} still not up, sorry." 2>&1
+        return 1
+    elif ! sshCheck "${hostname}"; then
+        echo "${hostname} ssh check failed." 2>&1
+        return 1
+    else
+        echo "Ready."
+    fi
 }
 
 ec2getOS() {
-	local input="${1}"
-	local id_and_name=""
-	local id=""
-	local hname=""
+    local input="${1}"
+    local id_and_name=""
+    local id=""
+    local hname=""
 
-	if [ x"${input}" = x"-h" ]; then
-		echo "Supported arguments: <hostname|id>" >&2
-		return 0
-	fi
+    if [ x"${input}" = x"-h" ]; then
+        echo "Supported arguments: <hostname|id>" >&2
+        return 0
+    fi
 
-	id_and_name="$(_id_and_name ${input})"
-	if [ -z "${id_and_name}" ]; then
-		echo "Invalid input." >&2
-		return 0
-	fi
-	id="${id_and_name%% *}"
+    id_and_name="$(_id_and_name ${input})"
+    if [ -z "${id_and_name}" ]; then
+        echo "Invalid input." >&2
+        return 0
+    fi
+    id="${id_and_name%% *}"
 
-	ami=$(_aedi  --instance-ids "${id}" | jq -r '.Reservations[0].Instances[0].ImageId')
-	if [ -n "${ami}" ]; then
-		descr=$(aws ec2 describe-images --image-id "${ami}" |
-			jq -r '.Images[0].Description')
-		if expr "${descr}" : "OmniOS" >/dev/null 2>&1 ; then
-			echo "omnios"
-		elif expr "${descr}" : "FreeBSD" >/dev/null 2>&1 ; then
-			echo "freebsd"
-		elif expr "${descr}" : "Debian" >/dev/null 2>&1 ; then
-			echo "debian"
-		elif expr "${descr}" : "Fedora" >/dev/null 2>&1 ; then
-			echo "fedora"
-		elif expr "${descr}" : "Canonical" >/dev/null 2>&1 ; then
-			echo "ubuntu"
-		elif expr "${descr}" : "NetBSD.*10.0" >/dev/null 2>&1 ; then
-			echo "netbsd"
-		fi
-	fi
+    local ami
+    ami=$(_aedi  --instance-ids "${id}" | jq -r '.Reservations[0].Instances[0].ImageId')
+    if [ -n "${ami}" ]; then
+        local descr
+        descr="$(aws ec2 describe-images --image-id "${ami}" | jq -r '.Images[0].Description')"
+        if expr "${descr}" : "OmniOS" >/dev/null 2>&1 ; then
+            echo "omnios"
+        elif expr "${descr}" : "FreeBSD" >/dev/null 2>&1 ; then
+            echo "freebsd"
+        elif expr "${descr}" : "Debian" >/dev/null 2>&1 ; then
+            echo "debian"
+        elif expr "${descr}" : "Fedora" >/dev/null 2>&1 ; then
+            echo "fedora"
+        elif expr "${descr}" : "Canonical" >/dev/null 2>&1 ; then
+            echo "ubuntu"
+        elif expr "${descr}" : "NetBSD.*10.0" >/dev/null 2>&1 ; then
+            echo "netbsd"
+        fi
+    fi
 }
 
 sshCheck() {
-	local hname="${1}"
+    local hname="${1}"
 
-	if [ x"${hname}" = x"-h" ]; then
-		echo "Supported arguments: <hostname|id>" >&2
-		return 0
-	fi
+    if [ x"${hname}" = x"-h" ]; then
+        echo "Supported arguments: <hostname|id>" >&2
+        return 0
+    fi
 
-	if expr "${hname}" : "i-[a-f0-9]*$" >/dev/null 2>&1 ; then
-		hname=$(iname ${hname})
-	fi
+    if expr "${hname}" : "i-[a-f0-9]*$" >/dev/null 2>&1 ; then
+        hname=$(iname ${hname})
+    fi
 
-	if [ -z "${hname}" ]; then
-		echo "Usage: sshCheck <hostname|id>" >&2
-		return 1
-	fi
+    if [ -z "${hname}" ]; then
+        echo "Usage: sshCheck <hostname|id>" >&2
+        return 1
+    fi
 
-	if ping -q -c 1 "${hname}" >/dev/null 2>&1 ; then
-		timeout 2 /bin/sh -c "echo | nc ${hname} 22 >/dev/null 2>&1" >/dev/null 2>&1
-		if [ $? -eq 0 ]; then
-			return 0
-		fi
-	fi
+    if ping -q -c 1 "${hname}" >/dev/null 2>&1 ; then
+        timeout 2 /bin/sh -c "echo | nc ${hname} 22 >/dev/null 2>&1" >/dev/null 2>&1
+        if [ "$?" -eq 0 ]; then
+            return 0
+        fi
+    fi
 
-	return 1
+    return 1
 }
 
 # A generic function to invoke an EC2 operation on a
 # single instance-id or hostname.
 _instanceOperation() {
-	local op="${1}"
-	local hname="${2}"
-	local arg="--instance-ids"
-	local out="json"
+    local op="${1}"
+    local hname="${2}"
+    local arg="--instance-ids"
+    local out="json"
 
-	if [ x"${hname}" = x"-h" ]; then
-		echo "Supported arguments: <hostname|id>" >&2
-		return 0
-	fi
-	if expr "${hname}" : "ec2-" >/dev/null 2>&1 ; then
-		hname="$(instanceId ${hname})"
-	elif ! expr "${hname}" : "i-" >/dev/null 2>&1 ; then
-		echo "<hostname|id> should match 'ec2-*' or 'i-*'" >&2
-		return 0
-	fi
+    if [ x"${hname}" = x"-h" ]; then
+        echo "Supported arguments: <hostname|id>" >&2
+        return 0
+    fi
+    if expr "${hname}" : "ec2-" >/dev/null 2>&1 ; then
+        hname="$(instanceId "${hname}")"
+    elif ! expr "${hname}" : "i-" >/dev/null 2>&1 ; then
+        echo "<hostname|id> should match 'ec2-*' or 'i-*'" >&2
+        return 0
+    fi
 
-	case "${op}" in
-		"get-console-output")
-			arg="--instance-id"
-			out="text"
-		;;
-		"modify-instance"*)
-			arg="--instance-id"
-		;;
-	esac
+    case "${op}" in
+        "get-console-output")
+            arg="--instance-id"
+            out="text"
+        ;;
+        "modify-instance"*)
+            arg="--instance-id"
+        ;;
+    esac
 
-	eval aws ec2 ${op} --output ${out} ${arg} "${hname}"
+    eval aws ec2 ${op} --output "${out}" ${arg} "${hname}"
 }
 
 
 _id_and_name() {
-	local input="${1}"
-	local hname=""
-	local id=""
+    local input="${1}"
+    local hname=""
+    local id=""
 
-	if expr "${input}" : "ec2-" >/dev/null 2>&1 ; then
-		hname="${input}"
-		id="$(instanceId ${input})"
-	elif expr "${input}" : "i-" >/dev/null 2>&1 ; then
-		hname="$(iname ${input})"
-		id="${input}"
-	else
-		echo "<hostname|id> should match 'ec2-*' or 'i-*'" >&2
-		return
-	fi
+    if expr "${input}" : "ec2-" >/dev/null 2>&1 ; then
+        hname="${input}"
+        id="$(instanceId "${input}")"
+    elif expr "${input}" : "i-" >/dev/null 2>&1 ; then
+        hname="$(iname "${input}")"
+        id="${input}"
+    else
+        echo "<hostname|id> should match 'ec2-*' or 'i-*'" >&2
+        return
+    fi
 
-	echo "${id} ${hname}"
+    echo "${id} ${hname}"
 }
 
 instanceStatus() {
-	local id_and_name=""
-	local id=""
-	local hname=""
-	local os=""
-	local status=""
-	local args="$@"
+    local id_and_name=""
+    local id=""
+    local hname=""
+    local os=""
+    local status=""
+    local args="$@"
 
-	if [ x"${1}" = x"-h" ]; then
-		echo "Supported arguments: <hostname|id>" >&2
-		echo "Output: <id> <hostname> <os> <status>" >&2
-		return 0
-	fi
+    if [ x"${1}" = x"-h" ]; then
+        echo "Supported arguments: <hostname|id>" >&2
+        echo "Output: <id> <hostname> <os> <status>" >&2
+        return 0
+    fi
 
-	if [ -z "${args}" ]; then
-		args="$(instances)"
-	fi
+    if [ -z "${args}" ]; then
+        args="$(instances)"
+    fi
 
-	for i in ${args}; do
-		id_and_name="$(_id_and_name ${i})"
-		if [ -z "${id_and_name}" ]; then
-			continue
-		fi
-		hname="${id_and_name##* }"
-		id="${id_and_name%% *}"
-		status=$(_instanceOperation describe-instances "${id}" | \
-			jq -r '.Reservations[].Instances[].State.Name')
-		os=$(ec2getOS ${id})
-		echo "${id} ${hname:-<none>} ${os:-<none>} ${status}"
-	done
+    for i in ${args}; do
+        id_and_name="$(_id_and_name "${i}")"
+        if [ -z "${id_and_name}" ]; then
+            continue
+        fi
+        hname="${id_and_name##* }"
+        id="${id_and_name%% *}"
+        status=$(_instanceOperation describe-instances "${id}" | \
+            jq -r '.Reservations[].Instances[].State.Name')
+        os="$(ec2getOS "${id}")"
+        echo "${id} ${hname:-<none>} ${os:-<none>} ${status}"
+    done
 }
 
 console() {
-	_instanceOperation get-console-output "${1}"
+    _instanceOperation get-console-output "${1}"
 }
 
 termInstance() {
-	_instanceOperation terminate-instances "${1}" | \
-		jq -r '.TerminatingInstances[0].CurrentState.Name'
+    _instanceOperation terminate-instances "${1}" | jq -r '.TerminatingInstances[0].CurrentState.Name'
 }
 
 startInstance() {
-	_instanceOperation start-instances "${1}"
+    _instanceOperation start-instances "${1}"
 }
 
 stopInstance() {
-	_instanceOperation stop-instances "${1}"
+    _instanceOperation stop-instances "${1}"
 }
 
-protectІnstance() {
-	local hname="${1}"
-	local onoff="${2}"
-	local readonly mod="modify-instance-attribute"
-	local readonly arg="disable-api-termination"
+protectInstance() {
+    local hname="${1}"
+    local onoff="${2}"
+    local mod="modify-instance-attribute"
+    local arg="disable-api-termination"
 
-	if [ -z "${onoff}" -o x"${onoff}" = x"on" ]; then
-		_instanceOperation "${mod} --${arg}" "${1}"
-	elif [ x"${onoff}" = x"off" ]; then
-		_instanceOperation "${mod} --no-${arg}" "${1}"
-	else
-		echo "Usage: protectІnstance <instance> <on|off>" >&2;
-	fi
-	return 0
+    if [ -z "${onoff}" -o x"${onoff}" = x"on" ]; then
+        _instanceOperation "${mod} --${arg}" "${1}"
+    elif [ x"${onoff}" = x"off" ]; then
+        _instanceOperation "${mod} --no-${arg}" "${1}"
+    else
+        echo "Usage: protectInstance <instance> <on|off>" >&2;
+    fi
+    return 0
 }
 
 ###
@@ -371,104 +391,102 @@ protectІnstance() {
 # Create a new volume of size 1GB in us-east-1a unless
 # specified otherwise, e.g., "newVolume 3 us-west-1"
 newVolume() {
-	local instance=""
-	local volume=""
+    local instance=""
+    local volume=""
 
-	if [ x"${1}" = x"-i" ]; then
-		instance="${2:-none}"
-		shift
-		shift
-	fi
+    if [ x"${1}" = x"-i" ]; then
+        instance="${2:-none}"
+        shift
+        shift
+    fi
 
-	if [ x"${1}" = x"-h" ] || [ x"${instance}" = x"none" ]; then
-		echo "Usage: newVolume [-i instanceID] [size in GB] [availability-zone]"
-		echo "       default: 1, us-east-1a"
-		return 0
-	fi
+    if [ x"${1}" = x"-h" ] || [ x"${instance}" = x"none" ]; then
+        echo "Usage: newVolume [-i instanceID] [size in GB] [availability-zone]"
+        echo "       default: 1, us-east-1a"
+        return 0
+    fi
 
-	volume=$(aws ec2 create-volume --output json --size "${1:-1}" --availability-zone "${2:-us-east-1a}" | \
-		jq -r ".VolumeId")
-	echo "${volume}"
-	if [ -n "${instance}" ]; then
-		echo "Attaching ${volume} to ${instance}..."
-		sleep 2
-		attachVolume ${volume} ${instance} >/dev/null
-	fi
+    volume="$(aws ec2 create-volume --output json --size "${1:-1}" --availability-zone "${2:-us-east-1a}" | jq -r ".VolumeId")"
+    echo "${volume}"
+    if [ -n "${instance}" ]; then
+        echo "Attaching ${volume} to ${instance}..."
+        sleep 2
+        attachVolume "${volume}" "${instance}" >/dev/null
+    fi
 }
 
 # We often attach just one volume to a given instance,
 # so let's have a default function to save ourselves
 # some typing.
 attachVolume() {
-	local volume="${1}"
-	local instance="${2}"
-	local device="${3}"
-	local used=""
-	local base=101 # decimal 101 == 'e'
+    local volume="${1}"
+    local instance="${2}"
+    local device="${3}"
+    local used=""
+    local base=101 # decimal 101 == 'e'
 
-	if [ x"${1}" = x"-h" ] || [ -z "${volume}" ]; then
-		echo "Usage: attachVolume volume-id instance-id [device]"
-		echo "       default device: /dev/sdf"
-		return 0
-	fi
-	if [ -z "${instance}" ]; then
-		echo "Usage: attachVolume vol-id instance-id [device]" >&2
-		return 1
-	fi
-	if [ -z "${device}" ]; then
-		# We determine the '/dev/...' to use by counting the attached
-		# disks 'incrementing' the letter starting from 'f' (e + 1 if
-		# there's only one root disk).
-		used=$(aws ec2 describe-volumes --filters Name=attachment.instance-id,Values=${instance} | \
-			jq -r '[.Volumes[].Attachments[].Device] | length')
-		device="/dev/sd"$(printf "\\$(printf '%03o' $((${base} + ${used})))")
-	fi
-	aws ec2 attach-volume --output json --volume-id "${1}" --instance-id "${instance}" --device "${device}"
+    if [ x"${1}" = x"-h" ] || [ -z "${volume}" ]; then
+        echo "Usage: attachVolume volume-id instance-id [device]"
+        echo "       default device: /dev/sdf"
+        return 0
+    fi
+    if [ -z "${instance}" ]; then
+        echo "Usage: attachVolume vol-id instance-id [device]" >&2
+        return 1
+    fi
+    if [ -z "${device}" ]; then
+        # We determine the '/dev/...' to use by counting the attached
+        # disks 'incrementing' the letter starting from 'f' (e + 1 if
+        # there's only one root disk).
+        used=$(aws ec2 describe-volumes --filters Name=attachment.instance-id,Values="${instance}" | \
+               jq -r '[.Volumes[].Attachments[].Device] | length')
+        device="/dev/sd"$(printf "\\$(printf '%03o' $((${base} + ${used})))")
+    fi
+    aws ec2 attach-volume --output json --volume-id "${1}" --instance-id "${instance}" --device "${device}"
 }
 
-# Same for detachingk, but we don't need to know the
+# Same for detaching, but we don't need to know the
 # instance-id:
 detachVolume() {
-	local force=""
-	if [ x"${1}" = x"-f" ]; then
-		force="--force"
-		shift
-	fi
-	if [ -z "${1}" ]; then
-		echo "Usage: detachVolume vol-id" >&2
-		return 1
-	fi
-	local instance="$(aws ec2 describe-volumes --output json --volume-id "${1}" | \
-				jq -r '.Volumes[].Attachments[].InstanceId')"
-	if [ -z "${instance}" ]; then
-		echo "Volume ${1} not attached to any instance?" >&2
-		return
-	fi
-	aws ec2 detach-volume --output json --volume-id "${1}" --instance-id "${instance}" ${force}
+    local force=""
+    if [ x"${1}" = x"-f" ]; then
+        force="--force"
+        shift
+    fi
+    if [ -z "${1}" ]; then
+        echo "Usage: detachVolume vol-id" >&2
+        return 1
+    fi
+    local instance="$(aws ec2 describe-volumes --output json --volume-id "${1}" | \
+                      jq -r '.Volumes[].Attachments[].InstanceId')"
+    if [ -z "${instance}" ]; then
+        echo "Volume ${1} not attached to any instance?" >&2
+        return
+    fi
+    aws ec2 detach-volume --output json --volume-id "${1}" --instance-id "${instance}" ${force}
 }
 
 ec2volumes() {
-	aws ec2 describe-volumes --output json | \
-		jq -r '.Volumes[] | "\(.VolumeId) \(.Attachments[0].InstanceId // "not attached")"'
+    aws ec2 describe-volumes --output json | jq -r '.Volumes[] | "\(.VolumeId) \(.Attachments[0].InstanceId // "not attached")"'
 }
 
 ec2deleteVolumes() {
-	local volumes="${1}"
+    local volumes="${1}"
 
-	if [ x"${1}" = x"-h" ]; then
-		echo "Usage: ec2deleteVolumes [volume ...]"
-		return 0
-	fi
-	if [ -z "${volumes}" ]; then
-		for v in $(ec2volumes | awk '/not attached/ { print $1}'); do
-			volumes="${volumes} ${v}"
-		done
-	fi
+    if [ x"${1}" = x"-h" ]; then
+        echo "Usage: ec2deleteVolumes [volume ...]"
+        return 0
+    fi
+    if [ -z "${volumes}" ]; then
+        for v in $(ec2volumes | awk '/not attached/ { print $1}'); do
+            volumes="${volumes} ${v}"
+        done
+    fi
 
-	for v in ${volumes}; do
-		echo "Deleting volume ${v}..."
-		del-volume ${v}
-	done
+    for v in ${volumes}; do
+        echo "Deleting volume ${v}..."
+        del-volume "${v}"
+    done
 }
 
 # A simple function to determine your current AWS bill
@@ -479,146 +497,156 @@ ec2deleteVolumes() {
 # 'Read' and 'List' under "ce:".  (This may require
 # additional "Anomaly" resources.)
 awsCurrentBill() {
-	local readonly start="$(date -r $(( $(date +%s) - (86400 * 30) )) +%Y-%m-%d)"
-	local readonly end="$(date +%Y-%m-%d)"
-	local num
+    local start_epoch_secs="$(( $(date +%s) - (86400 * 30) ))"
 
-	num=$(aws ce get-cost-and-usage					\
-		--output json						\
-		--time-period Start=${start},End=${end}			\
-		--granularity MONTHLY					\
-		--metrics UnblendedCost					\
-		--query 'ResultsByTime[*].Total.[UnblendedCost]' |	\
-		jq '.[][0].Amount  | tonumber*100 | round/100')
+    # Convert seconds back to yyyy-MM-dd
+    # Of course the date utility isn't completely portable. Account for this.
+    local start
+    case "$(uname | tr '[:upper:]' '[:lower:]')" in
+        darwin) start="$(date -r "$start_epoch_secs" +%Y-%m-%d)" ;;
+        *) start="$(date -d "@$start_epoch_secs" +%Y-%m-%d)" ;;
+    esac
 
-	if [ -z "${num}" ]; then
-		return
-	fi
+    local end
+    end="$(date +%Y-%m-%d)"
+    local num
 
-	num=$(echo "0+${num}" | tr '\n' '+' | sed -e 's/\+$//' | xargs | bc)
+    num="$(aws ce get-cost-and-usage                          \
+           --output json                                      \
+           --time-period "Start=${start},End=${end}"          \
+           --granularity MONTHLY                              \
+           --metrics UnblendedCost                            \
+           --query 'ResultsByTime[*].Total.[UnblendedCost]' | \
+           jq '.[][0].Amount  | tonumber*100 | round/100')"
 
-	echo "AWS Billing Period ${start} - ${end}: \$${num}"
+    if [ -z "${num}" ]; then
+        return
+    fi
+
+    num="$(echo "0+${num}" | tr '\n' '+' | sed -e 's/\+$//' | xargs | bc)"
+
+    echo "AWS Billing Period ${start} - ${end}: \$${num}"
 }
 
 awsListResources() {
-	local spacer=""
-	local amis snapshots instances volumes
-	local ok region resource
-	local regions="${1}"
-	local which="${2:-all}"
+    local spacer=""
+    local amis snapshots instances volumes
+    local ok region resource
+    local regions="${1}"
+    local which="${2:-all}"
 
-	local valid="amis snapshots instances s3 volumes"
+    local valid="amis snapshots instances s3 volumes"
 
-	for v in ${valid}; do
-		if [ x"${regions}" = x"${v}" ]; then
-			which="${regions}"
-			regions=""
-			break
-		fi
-	done
+    for v in ${valid}; do
+        if [ x"${regions}" = x"${v}" ]; then
+            which="${regions}"
+            regions=""
+            break
+        fi
+    done
 
-	if [ x"${which}" != x"all" ]; then
-		for resource in ${valid}; do
-			if [ x"${which}" = x"${resource}" ]; then
-				ok="found"
-			fi
-		done
-		if [ x"${ok}" != x"found" ]; then
-			echo "Invalid argument '${which}'." >&2
-			echo "Please specify one of ${valid}." >&2
-			return 1
-		fi
-	fi
+    if [ x"${which}" != x"all" ]; then
+        for resource in ${valid}; do
+            if [ x"${which}" = x"${resource}" ]; then
+                ok="found"
+            fi
+        done
+        if [ x"${ok}" != x"found" ]; then
+            echo "Invalid argument '${which}'." >&2
+            echo "Please specify one of ${valid}." >&2
+            return 1
+        fi
+    fi
 
-	if [ -z "${regions}" ]; then
-		regions=$(aws configure get region)
-	elif [ x"${regions}" = x"all" ]; then
-		regions=$(aws ec2 describe-regions | jq -r '.Regions[].RegionName')
-	fi
+    if [ -z "${regions}" ]; then
+        regions="$(aws configure get region)"
+    elif [ x"${regions}" = x"all" ]; then
+        regions="$(aws ec2 describe-regions | jq -r '.Regions[].RegionName')"
+    fi
 
-	for region in ${regions}; do
+    for region in ${regions}; do
 
-		if [ x"${which}" = x"all" -o x"${which}" = x"amis" ]; then
-			amis=$(aws ec2 describe-images --region ${region} --owner self | \
-				jq -r '.Images[] | "\(.ImageId) \(.BlockDeviceMappings[0].Ebs.SnapshotId) \"\(.Description)\""')
-			if [ -n "${amis}" ]; then
-				/bin/echo -n "${spacer}"
-				echo "You have the following AMIs in ${region}:"
-				echo "${amis}"
-				spacer="
+        if [ x"${which}" = x"all" -o x"${which}" = x"amis" ]; then
+            amis=$(aws ec2 describe-images --region ${region} --owner self | \
+                jq -r '.Images[] | "\(.ImageId) \(.BlockDeviceMappings[0].Ebs.SnapshotId) \"\(.Description)\""')
+            if [ -n "${amis}" ]; then
+                /bin/echo -n "${spacer}"
+                echo "You have the following AMIs in ${region}:"
+                echo "${amis}"
+                spacer="
 "
-			fi
-		fi
+            fi
+        fi
 
-		if [ x"${which}" = x"all" -o x"${which}" = x"snapshots" ]; then
-			snapshots=$(aws ec2 describe-snapshots --region ${region} --owner self | \
-					jq -r '.Snapshots[] | "\(.SnapshotId) \(.StartTime)"')
-			if [ -n "${snapshots}" ]; then
-				/bin/echo -n "${spacer}"
-				echo "You have the following snapshots in ${region}:"
-				echo "${snapshots}"
-				spacer="
+        if [ x"${which}" = x"all" -o x"${which}" = x"snapshots" ]; then
+            snapshots=$(aws ec2 describe-snapshots --region ${region} --owner self | \
+                    jq -r '.Snapshots[] | "\(.SnapshotId) \(.StartTime)"')
+            if [ -n "${snapshots}" ]; then
+                /bin/echo -n "${spacer}"
+                echo "You have the following snapshots in ${region}:"
+                echo "${snapshots}"
+                spacer="
 "
-			fi
-		fi
+            fi
+        fi
 
-		if [ x"${which}" = x"all" -o x"${which}" = x"instances" ]; then
-			instances=$(aws ec2 describe-instances --region ${region} | \
-					jq -r '.Reservations[].Instances[] | "\(.InstanceId) (\(.State.Name)) \(.PublicDnsName)"')
-			if [ -n "${instances}" ]; then
-				/bin/echo -n "${spacer}"
-				echo "You have the following instances in ${region}:"
-				echo "${instances}"
-				spacer="
+        if [ x"${which}" = x"all" -o x"${which}" = x"instances" ]; then
+            instances=$(aws ec2 describe-instances --region ${region} | \
+                    jq -r '.Reservations[].Instances[] | "\(.InstanceId) (\(.State.Name)) \(.PublicDnsName)"')
+            if [ -n "${instances}" ]; then
+                /bin/echo -n "${spacer}"
+                echo "You have the following instances in ${region}:"
+                echo "${instances}"
+                spacer="
 "
-			fi
-		fi
+            fi
+        fi
 
-		if [ x"${which}" = x"all" -o x"${which}" = x"volumes" ]; then
-			volumes=$(aws ec2 describe-volumes --region ${region} |	\
-					jq -r '.Volumes[] | "\(.VolumeId) \(.CreateTime) \(.Attachments[0].InstanceId)"')
-			if [ -n "${volumes}" ]; then
-				/bin/echo -n "${spacer}"
-				echo "You have the following volumes in ${region}:"
-				echo "${volumes}"
-				spacer="
+        if [ x"${which}" = x"all" -o x"${which}" = x"volumes" ]; then
+            volumes=$(aws ec2 describe-volumes --region ${region} |    \
+                    jq -r '.Volumes[] | "\(.VolumeId) \(.CreateTime) \(.Attachments[0].InstanceId)"')
+            if [ -n "${volumes}" ]; then
+                /bin/echo -n "${spacer}"
+                echo "You have the following volumes in ${region}:"
+                echo "${volumes}"
+                spacer="
 "
-			fi
-		fi
-	done
+            fi
+        fi
+    done
 
-	if [ x"${which}" = x"all" -o x"${which}" = x"s3" ]; then
-		awsS3Usage "${spacer}"
-	fi
+    if [ x"${which}" = x"all" -o x"${which}" = x"s3" ]; then
+        awsS3Usage "${spacer}"
+    fi
 }
 
 awsS3Usage() {
-	local buckets
-	local b
-	local usage
-	local spacer="${1:-""}"
+    local buckets
+    local b
+    local usage
+    local spacer="${1:-""}"
 
-	buckets=$(aws s3api list-buckets --query "Buckets[].Name" | \
-			jq -r '.[]')
+    buckets=$(aws s3api list-buckets --query "Buckets[].Name" | \
+            jq -r '.[]')
 
-	if [ -n "${buckets}" ]; then
-		/bin/echo -n "${spacer}"
-		echo "You have the following S3 buckets:"
-		echo "${buckets}"
-		spacer="
+    if [ -n "${buckets}" ]; then
+        /bin/echo -n "${spacer}"
+        echo "You have the following S3 buckets:"
+        echo "${buckets}"
+        spacer="
 "
-	fi
+    fi
 
-	for b in ${buckets}; do
-		usage=$(aws s3 ls s3://${b} --recursive --summarize --human-readable | tail -2)
-		if [ $(echo "${usage}" | awk '{print $3; exit; }') -gt 0 ]; then
-			/bin/echo -n "${spacer}"
-			echo "${b}"
-			echo "${usage}"
-			spacer="
+    for b in ${buckets}; do
+        usage=$(aws s3 ls "s3://${b}" --recursive --summarize --human-readable | tail -2)
+        if [ "$(echo "${usage}" | awk '{print $3; exit; }')" -gt 0 ]; then
+            /bin/echo -n "${spacer}"
+            echo "${b}"
+            echo "${usage}"
+            spacer="
 "
-		fi
-	done
+        fi
+    done
 }
 
 ###
@@ -634,25 +662,36 @@ awsS3Usage() {
 # https://wiki.debian.org/Cloud/AmazonEC2Image/
 # Log in as "admin".
 # Debian 12 ("Bookworm") amd64
-alias aws-debian='launchInstance ami-0e8087266e36fe754'
+aws-debian() {
+    launchInstance ami-0e8087266e36fe754
+}
+
 # t4g.small instances are in the Free Tier until 2025-12-31
 # https://aws.amazon.com/ec2/faqs/#t4g-instances
-alias aws-debian-arm='launchInstance ami-ami-0be11dbb16042109e t4g.small'
+aws-debian-arm() {
+    launchInstance ami-ami-0be11dbb16042109e t4g.small
+}
 
 # https://omniosce.org/setup/aws
 # r151044
 # needs t3.micro; log in as "omnios"
-alias aws-omnios='launchInstance ami-0669dd7b1ff900fcc'
+aws-omnios() {
+    launchInstance ami-0669dd7b1ff900fcc
+}
 
 # https://fedoraproject.org/coreos/download?stream=stable
 # Log in as "core".
 # Fedora Cloud 41
-alias aws-fedora='launchInstance ami-062e91802cc9291d2'
+aws-fedora() {
+    launchInstance ami-062e91802cc9291d2
+}
 
 # https://cloud-images.ubuntu.com/locator/ec2/
 # Log in as "ubuntu". 
 # 16.04 LTS
-alias aws-ubuntu='launchInstance ami-0b0ea68c435eb488d'
+aws-ubuntu() {
+    launchInstance ami-0b0ea68c435eb488d
+}
 
 # https://www.freebsd.org/releases/
 # To find AMI ID:
@@ -661,7 +700,9 @@ alias aws-ubuntu='launchInstance ami-0b0ea68c435eb488d'
 # - Continue to Configuration
 # Log in as "ec2-user".
 # 14.2R (ZFS)
-alias aws-freebsd='launchInstance ami-04aa0233c96daa209'
+aws-freebsd() {
+    launchInstance ami-04aa0233c96daa209
+}
 
 # https://mail-index.netbsd.org/netbsd-users/2021/01/22/msg026460.html
 # https://stevens.netmeister.org/615/netbsd-amis.html
@@ -670,7 +711,15 @@ alias aws-freebsd='launchInstance ami-04aa0233c96daa209'
 # t4g.small instances are in the Free Tier until 2025-12-31
 # https://aws.amazon.com/ec2/faqs/#t4g-instances
 # Log in as "ec2-user":
-alias aws-netbsd='launchInstance ami-01eeb2af939d69edd t4g.small'
-alias aws-netbsd-arm='aws-netbsd'
+aws-netbsd() {
+    launchInstance ami-01eeb2af939d69edd t4g.small
+}
+
+aws-netbsd-arm() {
+    aws-netbsd
+}
+
 # Log in as "ec2-user":
-alias aws-netbsd-amd64='launchInstance ami-0999f80a08a9de4cc'
+aws-netbsd-amd64() {
+    launchInstance ami-0999f80a08a9de4cc
+}
