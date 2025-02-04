@@ -1,0 +1,8 @@
+#!/bin/sh
+
+[ "$#" = 0 ] && exit
+
+dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+[ -z "$dir" ] && dir='.'
+. "${dir}/awsfuncs"
+"$@"

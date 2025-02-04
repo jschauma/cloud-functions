@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # This file contains a few shell aliases and functions
 # that make routine AWS EC2 tasks easier.
 #
@@ -5,6 +7,13 @@
 #         @jschauma@mstdn.social
 #
 # This file is in the public domain.
+
+# I (AJ W) have edited this file to be more compatible with non-interactive scripts.
+# Interactive scripts don't play nicely with aliases, so I converted all the aliases
+# to functions.
+# There was also a compatibility bug with date(1), so I patched that.
+#
+# I hereby license all of my changes under CC0 and place my contributions into the public domain.
 
 # The name of your preferred SSH key for use with AWS.
 AWS_SSH_KEY="${AWS_SSH_KEY:-aws}"
@@ -102,7 +111,7 @@ launchInstance() {
 
 # Often I have an instance-id, but want to know what
 # the hostname associated with it is.  Specifically,
-# after we start an instance, we don't immedately get
+# after we start an instance, we don't immediately get
 # the hostname back, so use the 'iname' function
 # to get it:
 iname() {
