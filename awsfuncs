@@ -355,7 +355,7 @@ instanceStatus() {
         hname="${id_and_name##* }"
         id="${id_and_name%% *}"
         status=$(_instanceOperation describe-instances "${id}" | \
-            jq -r '.Reservations[].Instances[].State.Name')
+                 jq -r '.Reservations[].Instances[].State.Name')
         os="$(ec2getOS "${id}")"
         echo "${id} ${hname:-<none>} ${os:-<none>} ${status}"
     done
@@ -576,8 +576,8 @@ awsListResources() {
     for region in ${regions}; do
 
         if [ x"${which}" = x"all" -o x"${which}" = x"amis" ]; then
-            amis=$(aws ec2 describe-images --region ${region} --owner self | \
-                jq -r '.Images[] | "\(.ImageId) \(.BlockDeviceMappings[0].Ebs.SnapshotId) \"\(.Description)\""')
+            amis=$(aws ec2 describe-images --region "${region}" --owner self | \
+                   jq -r '.Images[] | "\(.ImageId) \(.BlockDeviceMappings[0].Ebs.SnapshotId) \"\(.Description)\""')
             if [ -n "${amis}" ]; then
                 /bin/echo -n "${spacer}"
                 echo "You have the following AMIs in ${region}:"
@@ -588,8 +588,8 @@ awsListResources() {
         fi
 
         if [ x"${which}" = x"all" -o x"${which}" = x"snapshots" ]; then
-            snapshots=$(aws ec2 describe-snapshots --region ${region} --owner self | \
-                    jq -r '.Snapshots[] | "\(.SnapshotId) \(.StartTime)"')
+            snapshots=$(aws ec2 describe-snapshots --region "${region}" --owner self | \
+                        jq -r '.Snapshots[] | "\(.SnapshotId) \(.StartTime)"')
             if [ -n "${snapshots}" ]; then
                 /bin/echo -n "${spacer}"
                 echo "You have the following snapshots in ${region}:"
@@ -600,8 +600,8 @@ awsListResources() {
         fi
 
         if [ x"${which}" = x"all" -o x"${which}" = x"instances" ]; then
-            instances=$(aws ec2 describe-instances --region ${region} | \
-                    jq -r '.Reservations[].Instances[] | "\(.InstanceId) (\(.State.Name)) \(.PublicDnsName)"')
+            instances=$(aws ec2 describe-instances --region "${region}" | \
+                        jq -r '.Reservations[].Instances[] | "\(.InstanceId) (\(.State.Name)) \(.PublicDnsName)"')
             if [ -n "${instances}" ]; then
                 /bin/echo -n "${spacer}"
                 echo "You have the following instances in ${region}:"
@@ -612,8 +612,8 @@ awsListResources() {
         fi
 
         if [ x"${which}" = x"all" -o x"${which}" = x"volumes" ]; then
-            volumes=$(aws ec2 describe-volumes --region ${region} |    \
-                    jq -r '.Volumes[] | "\(.VolumeId) \(.CreateTime) \(.Attachments[0].InstanceId)"')
+            volumes=$(aws ec2 describe-volumes --region "${region}" | \
+                      jq -r '.Volumes[] | "\(.VolumeId) \(.CreateTime) \(.Attachments[0].InstanceId)"')
             if [ -n "${volumes}" ]; then
                 /bin/echo -n "${spacer}"
                 echo "You have the following volumes in ${region}:"
@@ -636,7 +636,7 @@ awsS3Usage() {
     local spacer="${1:-""}"
 
     buckets=$(aws s3api list-buckets --query "Buckets[].Name" | \
-            jq -r '.[]')
+              jq -r '.[]')
 
     if [ -n "${buckets}" ]; then
         /bin/echo -n "${spacer}"
