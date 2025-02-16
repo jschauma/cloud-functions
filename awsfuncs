@@ -117,11 +117,6 @@ ec2wait() {
 		echo "That doesn't look like an instance ID." >&2
 		return 1;
 	fi
-	timeout 60 aws ec2 wait instance-running --output json --instance-ids $@ 2>/dev/null
-	if [ $? -gt 0 ]; then
-		echo "Instance terminated or not in running state or still pending after 60 seconds, giving up." 2>&1
-		return 1;
-	fi
 
 	# "running" does not mean SSH is up, so give it a bit more time,
 	# guessing different time intervals for different OS versions
@@ -156,8 +151,14 @@ ec2wait() {
 	echo "${user}"
 	echo
 
+	timeout 60 aws ec2 wait instance-running --output json --instance-ids $@ 2>/dev/null
+	if [ $? -gt 0 ]; then
+		echo "Instance terminated or not in running state or still pending after 60 seconds, giving up." 2>&1
+		return 1;
+	fi
+
 	if ! sshCheck "${hostname}" ; then
-		echo "Sleeping up to ${sleep} seconds to wait for ssh:"
+		echo "Instance in 'running' state - sleeping up to ${sleep} seconds to wait for ssh:"
 
 		n=5
 		while [ ${n} -lt ${sleep} ]; do
@@ -434,7 +435,7 @@ detachVolume() {
 		force="--force"
 		shift
 	fi
-	if [ -z "${1}" ]; then
+	if [ -z "${1}" ] || [ x"${1}" = x"-h" ]; then
 		echo "Usage: detachVolume vol-id" >&2
 		return 1
 	fi
@@ -670,7 +671,7 @@ alias aws-freebsd='launchInstance ami-04aa0233c96daa209'
 # t4g.small instances are in the Free Tier until 2025-12-31
 # https://aws.amazon.com/ec2/faqs/#t4g-instances
 # Log in as "ec2-user":
-alias aws-netbsd='launchInstance ami-01eeb2af939d69edd t4g.small'
+alias aws-netbsd='launchInstance ami-0afb6ea093e8945f7 t4g.small'
 alias aws-netbsd-arm='aws-netbsd'
 # Log in as "ec2-user":
-alias aws-netbsd-amd64='launchInstance ami-0999f80a08a9de4cc'
+alias aws-netbsd-amd64='launchInstance ami-03b92794664644a20'
