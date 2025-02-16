@@ -269,7 +269,7 @@ _instanceOperation() {
 
 	case "${op}" in
 		"get-console-output")
-			arg="--instance-id"
+			arg="--latest --instance-id"
 			out="text"
 		;;
 		"modify-instance"*)
