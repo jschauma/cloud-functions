@@ -135,7 +135,7 @@ ec2wait() {
 			user="admin"
 		;;
 		fedora)
-			user="core"
+			user="fedora"
 		;;
 		ubuntu)
 			user="ubuntu"
@@ -645,10 +645,10 @@ alias aws-debian-arm='launchInstance ami-ami-0be11dbb16042109e t4g.small'
 # needs t3.micro; log in as "omnios"
 alias aws-omnios='launchInstance ami-0669dd7b1ff900fcc'
 
-# https://fedoraproject.org/coreos/download?stream=stable
-# Log in as "core".
+# https://fedoraproject.org/cloud/download#cloud_launch
+# Log in as "fedora".
 # Fedora Cloud 41
-alias aws-fedora='launchInstance ami-062e91802cc9291d2'
+alias aws-fedora='launchInstance ami-046a6af96ef510bb6'
 
 # https://cloud-images.ubuntu.com/locator/ec2/
 # Log in as "ubuntu". 
