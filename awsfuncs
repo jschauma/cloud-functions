@@ -48,7 +48,7 @@ del-volume () {
 
 # Like 'killallInstances', but for EBS volumes:
 kill-all-volumes () {
-    volumes | xargs -n 1 aws ec2 delete-volume --volume-id "$@"
+    ec2volumes | xargs -n 1 aws ec2 delete-volume --volume-id "$@"
 }
 
 # Use this to see which instances you currently
@@ -692,7 +692,7 @@ aws-omnios() {
 # Log in as "core".
 # Fedora Cloud 41
 aws-fedora() {
-    launchInstance ami-062e91802cc9291d2
+    launchInstance ami-046a6af96ef510bb6
 }
 
 # https://cloud-images.ubuntu.com/locator/ec2/
