@@ -1,8 +1,8 @@
 #!/bin/bash
 
-[ "$#" = 0 ] && exit
+scriptdir="$(dirname -- "${BASH_SOURCE[0]}")"
 
-dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-[ -z "$dir" ] && dir='.'
-. "${dir}/awsfuncs"
-"$@"
+{ echo 'shopt -s expand_aliases;'; cat -- "${scriptdir}/awsfuncs"; printf "%q " "$@"; echo; } | exec bash -s
+
+exit $?
+
