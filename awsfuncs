@@ -252,7 +252,7 @@ sshCheck() {
 # single instance-id or hostname.
 _instanceOperation() {
 	local op="${1}"
-	local hname="${2}"
+	local hname="${2##*@}"
 	local arg="--instance-ids"
 	local out="json"
 
