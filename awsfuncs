@@ -636,6 +636,9 @@ awsS3Usage() {
 # Log in as "admin".
 # Debian 12 ("Bookworm") amd64
 alias aws-debian='launchInstance ami-0e8087266e36fe754'
+alias aws-debian-sa='launchInstance ami-0894ba6250e285e06'
+alias aws-debian-eu='launchInstance ami-023cb35652e8beaea'
+alias aws-debian-ap='launchInstance ami-084d1843588caf9db'
 # t4g.small instances are in the Free Tier until 2025-12-31
 # https://aws.amazon.com/ec2/faqs/#t4g-instances
 alias aws-debian-arm='launchInstance ami-ami-0be11dbb16042109e t4g.small'
@@ -649,11 +652,17 @@ alias aws-omnios='launchInstance ami-0669dd7b1ff900fcc'
 # Log in as "fedora".
 # Fedora Cloud 41
 alias aws-fedora='launchInstance ami-046a6af96ef510bb6'
+alias aws-fedora-sa='launchInstance ami-092973d44d3c4bc5c'
+alias aws-fedora-eu='launchInstance ami-0757331d089cc9cbe'
+alias aws-fedora-ap='launchInstance ami-085252222269099c7'
 
 # https://cloud-images.ubuntu.com/locator/ec2/
 # Log in as "ubuntu". 
 # 16.04 LTS
 alias aws-ubuntu='launchInstance ami-0b0ea68c435eb488d'
+alias aws-ubuntu-sa='launchInstance ami-0a729bdc1acf7528b'
+alias aws-ubuntu-eu='launchInstance ami-09042b2f6d07d164a'
+alias aws-ubuntu-ap='launchInstance ami-0ae12517fe595ce17'
 
 # https://www.freebsd.org/releases/
 # To find AMI ID:
