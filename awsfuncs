@@ -215,7 +215,7 @@ ec2getOS() {
 			echo "fedora"
 		elif expr "${descr}" : "Canonical" >/dev/null 2>&1 ; then
 			echo "ubuntu"
-		elif expr "${descr}" : "NetBSD.*10.0" >/dev/null 2>&1 ; then
+		elif expr "${descr}" : "NetBSD.*10" >/dev/null 2>&1 ; then
 			echo "netbsd"
 		fi
 	fi
