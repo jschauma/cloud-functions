@@ -174,7 +174,7 @@ linSummary() {
 	if [ -z "${arg}" ]; then
 		ids="$(linstances)"
 	elif expr "${arg}" : "[0-9]*$" >/dev/null 2>&1; then
-		ids="${h}"
+		ids="${arg}"
 	elif expr "${arg}" : "[a-z]*$" >/dev/null 2>&1; then
 		ids=$(linstances "${arg}")
 	else
