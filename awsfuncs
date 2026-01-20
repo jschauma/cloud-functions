@@ -634,14 +634,14 @@ awsS3Usage() {
 
 # https://wiki.debian.org/Cloud/AmazonEC2Image/
 # Log in as "admin".
-# Debian 12 ("Bookworm") amd64
-alias aws-debian='launchInstance ami-0e8087266e36fe754'
-alias aws-debian-sa='launchInstance ami-0894ba6250e285e06'
-alias aws-debian-eu='launchInstance ami-023cb35652e8beaea'
-alias aws-debian-ap='launchInstance ami-084d1843588caf9db'
+# Debian 13 ("Trixie") amd64
+alias aws-debian='launchInstance ami-05c546c5ae2f91899'
+alias aws-debian-sa='launchInstance ami-08c9be4bcd4938263'
+alias aws-debian-eu='launchInstance ami-0ac7b8207fb477bcb'
+alias aws-debian-ap='launchInstance ami-02398704ff7cb96ba'
 # t4g.small instances are in the Free Tier until 2025-12-31
 # https://aws.amazon.com/ec2/faqs/#t4g-instances
-alias aws-debian-arm='launchInstance ami-ami-0be11dbb16042109e t4g.small'
+alias aws-debian-arm='launchInstance ami-0786f71ee78232d2c t4g.small'
 
 # https://omniosce.org/setup/aws
 # r151044
@@ -650,11 +650,11 @@ alias aws-omnios='launchInstance ami-0669dd7b1ff900fcc'
 
 # https://fedoraproject.org/cloud/download#cloud_launch
 # Log in as "fedora".
-# Fedora Cloud 41
-alias aws-fedora='launchInstance ami-046a6af96ef510bb6'
-alias aws-fedora-sa='launchInstance ami-092973d44d3c4bc5c'
-alias aws-fedora-eu='launchInstance ami-0757331d089cc9cbe'
-alias aws-fedora-ap='launchInstance ami-085252222269099c7'
+# Fedora Cloud 43
+alias aws-fedora='launchInstance ami-00dc827c2f70eb9d7'
+alias aws-fedora-sa='launchInstance ami-053aac5d05443b9c8'
+alias aws-fedora-eu='launchInstance ami-06fc33b3d7bc43707'
+alias aws-fedora-ap='launchInstance ami-095be13870d8257c3'
 
 # https://cloud-images.ubuntu.com/locator/ec2/
 # Log in as "ubuntu". 
@@ -671,9 +671,13 @@ alias aws-ubuntu24='launchInstance ami-0565c7ec71d5e8b8d'
 # - Follow link to AWS Marketplace
 # - View Purchase Options
 # - Continue to Configuration
+# or:
+# aws ssm get-parameters-by-path \
+#     --path /aws/service/freebsd/amd64/base/zfs/15.0/RELEASE \
+#     --query 'Parameters[].Value'
 # Log in as "ec2-user".
-# 14.2R (ZFS)
-alias aws-freebsd='launchInstance ami-04aa0233c96daa209'
+# 15.0 (ZFS)
+alias aws-freebsd='launchInstance ami-07c20e7f515b0ee71'
 
 # https://mail-index.netbsd.org/netbsd-users/2021/01/22/msg026460.html
 # https://stevens.netmeister.org/615/netbsd-amis.html
