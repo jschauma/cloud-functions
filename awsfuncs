@@ -70,7 +70,15 @@ launchInstance() {
 	local itype=${2:-"${DEFAULT_INSTANCE_TYPE}"}
 	
 	subnet=$(aws ec2 describe-subnets --output json | jq -r '.Subnets[] | select( .Tags[]? | select(.Value == "dualstack")).SubnetId')
+	if [ -z "${subnet}" ]; then
+		echo "Unable to find subnet labeled 'dualstack'." >&2
+		return 0
+	fi
 	sg=$(aws ec2 describe-security-groups --output json | jq -r '.SecurityGroups [] | select( .GroupName == "dualstack").GroupId')
+	if [ -z "${sg}" ]; then
+		echo "Unable to find security group labeled 'dualstack'." >&2
+		return 0
+	fi
 	instance ${ami}				\
 		--instance-type ${itype}	\
 		--subnet-id "${subnet}"		\
