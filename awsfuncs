@@ -31,9 +31,6 @@ alias instance='aws ec2 run-instances --key-name ${AWS_SSH_KEY} --output json --
 # Like 'termInstance', but for a single EBS volume:
 alias del-volume='aws ec2 delete-volume --volume-id'
 
-# Like 'killallInstances', but for EBS volumes:
-alias kill-all-volumes='volumes | xargs -n 1 aws ec2 delete-volume --volume-id'
-
 # Use this to see which instances you currently
 # have, regardless of their state.
 alias instances='_aedi | jq -r ".Reservations[].Instances[].InstanceId"'
