@@ -432,7 +432,7 @@ attachVolume() {
 	aws ec2 attach-volume --output json --volume-id "${1}" --instance-id "${instance}" --device "${device}"
 }
 
-# Same for detachingk, but we don't need to know the
+# Same for detaching, but we don't need to know the
 # instance-id:
 detachVolume() {
 	local force=""
