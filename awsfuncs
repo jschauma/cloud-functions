@@ -5,6 +5,9 @@
 #         @jschauma@mstdn.social
 #
 # This file is in the public domain.
+#
+# Fake ident:
+# $Id: https://github.com/jschauma/cloud-functions/blob/main/awsfuncs 2026-02-02 $
 
 # The name of your preferred SSH key for use with AWS.
 AWS_SSH_KEY="${AWS_SSH_KEY:-aws}"
