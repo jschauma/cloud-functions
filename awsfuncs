@@ -549,6 +549,12 @@ awsListResources() {
 
 	local valid="amis snapshots instances s3 volumes"
 
+	if [ x"${regions}" = x"-h" ]; then
+		echo "Usage: awsListResources [${valid}] [<region>|all]" >&2
+		return 0
+	fi
+
+
 	for v in ${valid}; do
 		if [ x"${regions}" = x"${v}" ]; then
 			which="${regions}"
