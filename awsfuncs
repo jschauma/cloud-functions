@@ -723,6 +723,7 @@ alias aws-ubuntu24='launchInstance ami-0565c7ec71d5e8b8d'
 # Log in as "ec2-user".
 # 15.0 (ZFS)
 alias aws-freebsd='launchInstance ami-07c20e7f515b0ee71'
+alias aws-freebsd-ufs='launchInstance ami-084857d50450bf03f'
 
 # https://mail-index.netbsd.org/netbsd-users/2021/01/22/msg026460.html
 # https://stevens.netmeister.org/615/netbsd-amis.html
