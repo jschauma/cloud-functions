@@ -696,7 +696,7 @@ alias aws-omnios='launchInstance ami-0669dd7b1ff900fcc'
 # https://fedoraproject.org/cloud/download#cloud_launch
 # Log in as "fedora".
 # Fedora Cloud 43
-alias aws-fedora='launchInstance ami-00dc827c2f70eb9d7'
+alias aws-fedora='launchInstance ami-0edf1d45580ac3fa3'
 alias aws-fedora-sa='launchInstance ami-053aac5d05443b9c8'
 alias aws-fedora-eu='launchInstance ami-06fc33b3d7bc43707'
 alias aws-fedora-ap='launchInstance ami-095be13870d8257c3'
