@@ -388,7 +388,7 @@ pingHost() {
 	${ping} -q -c 1 "${hname}" >/dev/null 2>&1
 }
 
-protectІnstance() {
+protectInstance() {
 	local hname="${1}"
 	local onoff="${2}"
 	local readonly mod="modify-instance-attribute"
