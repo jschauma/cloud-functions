@@ -17,6 +17,11 @@
 # The name of your default SSH key for use with Linode
 LINODE_SSH_KEY="${LINODE_SSH_KEY:-linode}"
 
+# If you have multiple accounts / users configured,
+# then it can be useful to be able to switch just by
+# setting this variable:
+LINODE_USER="${LINODE_USER:-${USER}}"
+
 # Your preferred region
 LINODE_DEFAULT_REGION="${LINODE_DEFAULT_REGION:-us-east}"
 
@@ -38,7 +43,7 @@ cloudInitData() {
 	cat <<EOF | base64 ${b64flags}
 #cloud-config
 users:
-  - name: ${USER}
+  - name: ${LINODE_USER}
     groups: sudo
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
@@ -51,18 +56,18 @@ EOF
 # Generic handling of instances first
 ###
 
-alias licl='linode-cli --json linodes'
-alias licl_t='linode-cli --ascii-table linodes'
+alias licl='linode-cli --as-user ${LINODE_USER} --json linodes'
+alias licl_t='linode-cli --as-user ${LINODE_USER} --ascii-table linodes'
 
 # Linodes must have a root password set, but we don't
 # use it, so generate a new password.
 alias newpass='</dev/urandom env LC_ALL=C tr -dc "[:print:]" | head -c 12'
 
 # Linode creation defaults:
-alias linstance='licl create --authorized_users ${USER} --private_ip false --root_pass "$(newpass)"'
+alias linstance='licl create --authorized_users ${LINODE_USER} --private_ip false --root_pass "$(newpass)"'
 
 launchLinode() {
-	local image="${1:-linode/debian12}"
+	local image="${1:-linode/debian13}"
 	local region="${2:-${LINODE_DEFAULT_REGION}}"
 	local type="${3:-g6-nanode-1}"
 
