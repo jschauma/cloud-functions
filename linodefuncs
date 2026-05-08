@@ -71,12 +71,12 @@ launchLinode() {
 	local region="${2:-${LINODE_DEFAULT_REGION}}"
 	local type="${3:-g6-nanode-1}"
 
-	linstance --image "${image}"				\
-		--region "${region}"				\
-		--type "${type}" 				\
-		--label "${image##*/}-${region}-$(date +%s)"    \
-		--no-defaults 					\
-		--metadata.user_data "$(cloudInitData)" |	\
+	linstance --image "${image}"                          \
+		--region "${region}"                          \
+		--type "${type}"                              \
+		--label "${image##*/}-${region}-$(date +%s)"  \
+		--no-defaults                                 \
+		--metadata.user_data "$(cloudInitData)" |     \
 		jq -r '.[].id'
 }
 
@@ -445,5 +445,5 @@ lsshCheck() {
 ###
 
 alias lin-debian='launchLinode'
-alias lin-fedora='launchLinode linode/fedora40'
+alias lin-fedora='launchLinode linode/fedora43'
 alias lin-ubuntu='launchLinode linode/ubuntu24.04'
