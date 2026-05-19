@@ -25,6 +25,13 @@ LINODE_USER="${LINODE_USER:-${USER}}"
 # Your preferred region
 LINODE_DEFAULT_REGION="${LINODE_DEFAULT_REGION:-us-east}"
 
+# If you have a default firewall, set it here.
+LINODE_FIREWALL="${LINODE_FIREWALL:-Default}"
+
+# If you have a preferred label prefix, set it here.
+# It will be appended with "-$(date +%s)".
+LINODE_LABEL="${LINODE_LABEL:-""}"
+
 _tout=$(which timeout 2>/dev/null)
 if [ -z "${_tout}" ]; then
 	timeout() { perl -e 'alarm shift; exec @ARGV' "$@"; }
@@ -70,13 +77,18 @@ launchLinode() {
 	local image="${1:-linode/debian13}"
 	local region="${2:-${LINODE_DEFAULT_REGION}}"
 	local type="${3:-g6-nanode-1}"
+	local label_prefix="${LINODE_LABEL:-${image##*/}-${region}}"
 
-	linstance --image "${image}"                          \
-		--region "${region}"                          \
-		--type "${type}"                              \
-		--label "${image##*/}-${region}-$(date +%s)"  \
-		--no-defaults                                 \
-		--metadata.user_data "$(cloudInitData)" |     \
+	local fw="$(linode-cli --as-user ${LINODE_USER} --json firewalls \
+			ls --label "${LINODE_FIREWALL}" | jq -r '.[].id')"
+
+	linstance --image "${image}"				\
+		--region "${region}"				\
+		--type "${type}" 				\
+		--label "${label_prefix}-$(date +%s)"    \
+		--no-defaults 					\
+		${fw:+--firewall_id ${fw}}			\
+		--metadata.user_data "$(cloudInitData)" |	\
 		jq -r '.[].id'
 }
 
@@ -445,5 +457,5 @@ lsshCheck() {
 ###
 
 alias lin-debian='launchLinode'
-alias lin-fedora='launchLinode linode/fedora43'
+alias lin-fedora='launchLinode linode/fedora40'
 alias lin-ubuntu='launchLinode linode/ubuntu24.04'
