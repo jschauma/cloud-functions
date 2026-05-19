@@ -457,5 +457,5 @@ lsshCheck() {
 ###
 
 alias lin-debian='launchLinode'
-alias lin-fedora='launchLinode linode/fedora40'
+alias lin-fedora='launchLinode linode/fedora43'
 alias lin-ubuntu='launchLinode linode/ubuntu24.04'
