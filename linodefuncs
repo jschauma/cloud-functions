@@ -22,6 +22,10 @@ LINODE_SSH_KEY="${LINODE_SSH_KEY:-linode}"
 # setting this variable:
 LINODE_USER="${LINODE_USER:-${USER}}"
 
+# If you want to have a cloud-init created user with
+# a different name from your linode account user.
+LINODE_CLOUD_INIT_USER="${LINODE_CLOUD_INIT_USER:-${LINODE_USER}}"
+
 # Your preferred region
 LINODE_DEFAULT_REGION="${LINODE_DEFAULT_REGION:-us-east}"
 
@@ -31,6 +35,13 @@ LINODE_FIREWALL="${LINODE_FIREWALL:-Default}"
 # If you have a preferred label prefix, set it here.
 # It will be appended with "-$(date +%s)".
 LINODE_LABEL="${LINODE_LABEL:-""}"
+
+# If you want to use a stackscript, specify it's ID
+# via this variable:
+LINODE_STACKSCRIPT="${LINODE_STACKSCRIPT:-""}"
+
+# ...as well as any stackscript data:
+LINODE_STACKSCRIPT_DATA="${LINODE_STACKSCRIPT_DATA:-""}"
 
 _tout=$(which timeout 2>/dev/null)
 if [ -z "${_tout}" ]; then
@@ -50,7 +61,7 @@ cloudInitData() {
 	cat <<EOF | base64 ${b64flags}
 #cloud-config
 users:
-  - name: ${LINODE_USER}
+  - name: ${LINODE_CLOUD_INIT_USER}
     groups: sudo
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
@@ -79,15 +90,19 @@ launchLinode() {
 	local type="${3:-g6-nanode-1}"
 	local label_prefix="${LINODE_LABEL:-${image##*/}-${region}}"
 
+
 	local fw="$(linode-cli --as-user ${LINODE_USER} --json firewalls \
 			ls --label "${LINODE_FIREWALL}" | jq -r '.[].id')"
 
 	linstance --image "${image}"				\
 		--region "${region}"				\
 		--type "${type}" 				\
-		--label "${label_prefix}-$(date +%s)"    \
+		--label "${label_prefix}-$(date +%s)"		\
 		--no-defaults 					\
 		${fw:+--firewall_id ${fw}}			\
+		${LINODE_STACKSCRIPT:+--stackscript_id ${LINODE_STACKSCRIPT}} \
+		${LINODE_STACKSCRIPT_DATA:+--stackscript_data}	\
+		${LINODE_STACKSCRIPT_DATA:+"${LINODE_STACKSCRIPT_DATA}"} \
 		--metadata.user_data "$(cloudInitData)" |	\
 		jq -r '.[].id'
 }
