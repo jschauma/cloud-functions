@@ -43,6 +43,18 @@ LINODE_STACKSCRIPT="${LINODE_STACKSCRIPT:-""}"
 # ...as well as any stackscript data:
 LINODE_STACKSCRIPT_DATA="${LINODE_STACKSCRIPT_DATA:-""}"
 
+# If you want to use 1Password for your linode-cli
+# access token, set this variable:
+LINODE_USE_OP="${LINODE_USE_OP:-""}"
+
+if [ -n "${LINODE_USE_OP}" ]; then
+	# If you have your linode-cli creds in a non-default
+	# account, specify it here:
+	LINODE_OP_ACCOUNT="${LINODE_OP_ACCOUNT:-"${OP_ACCOUNT:-"my.1password.com"}"}"
+
+	alias linode-cli='op ${LINODE_OP_ACCOUNT:+--account} ${LINODE_OP_ACCOUNT} plugin run -- linode-cli'
+fi
+
 _tout=$(which timeout 2>/dev/null)
 if [ -z "${_tout}" ]; then
 	timeout() { perl -e 'alarm shift; exec @ARGV' "$@"; }
