@@ -32,6 +32,14 @@ LINODE_DEFAULT_REGION="${LINODE_DEFAULT_REGION:-us-east}"
 # If you have a default firewall, set it here.
 LINODE_FIREWALL="${LINODE_FIREWALL:-Default}"
 
+# If you want to use a VPC, set it here.
+LINODE_VPC="${LINODE_VPC:-""}"
+
+# If you want to specify a subnet, specify that as
+# well.  Otherwise, we'll look for a subnet labeled
+# "default".
+LINODE_SUBNET="${LINODE_SUBNET:-${LINODE_VPC:+default}}"
+
 # If you have a preferred label prefix, set it here.
 # It will be appended with "-$(date +%s)".
 LINODE_LABEL="${LINODE_LABEL:-""}"
@@ -63,6 +71,25 @@ fi
 _uname=$(uname)
 
 ##
+
+_buildVPCFlags() {
+	local subnetid=""
+	local vpcregion=""
+
+	subnetid=$(linode-cli --json vpcs subnets-ls --label default ${LINODE_VPC} 2>/dev/null | jq -r '.[] | .id')
+	if [ -z "${subnetid}" ]; then
+		echo "Unable to get subnet id for default subnet in VPC ${LINODE_VPC}." >&2
+		return
+	fi
+
+	cat <<EOF
+[
+  { "purpose": "public" },
+  { "purpose": "vpc", "subnet_id" : ${subnetid} }
+]
+EOF
+}
+
 cloudInitData() {
 	local b64flags=""
 
@@ -101,7 +128,18 @@ launchLinode() {
 	local region="${2:-${LINODE_DEFAULT_REGION}}"
 	local type="${3:-g6-nanode-1}"
 	local label_prefix="${LINODE_LABEL:-${image##*/}-${region}}"
+	local vpcflags=""
 
+	if [ -n "${LINODE_VPC}" ] && [ x"${LINODE_SUBNET}" = x"default" ]; then
+		vpcflags="$(_buildVPCFlags)"
+	fi
+
+	vpcregion=$(linode-cli --json vpcs ls --id ${LINODE_VPC} 2>/dev/null | jq -r '.[].region')
+	if [ x"${vpcregion}" != x"${region}" ]; then
+		echo "VPC region (${vpcregion}) != requested region (${region})" >&2;
+		echo "Using ${vpcregion}..." >&2
+		region="${vpcregion}"
+	fi
 
 	local fw="$(linode-cli --as-user ${LINODE_USER} --json firewalls \
 			ls --label "${LINODE_FIREWALL}" | jq -r '.[].id')"
@@ -115,6 +153,7 @@ launchLinode() {
 		${LINODE_STACKSCRIPT:+--stackscript_id ${LINODE_STACKSCRIPT}} \
 		${LINODE_STACKSCRIPT_DATA:+--stackscript_data}	\
 		${LINODE_STACKSCRIPT_DATA:+"${LINODE_STACKSCRIPT_DATA}"} \
+		${vpcflags:+--interfaces} ${vpcflags:+"${vpcflags}"}\
 		--metadata.user_data "$(cloudInitData)" |	\
 		jq -r '.[].id'
 }
