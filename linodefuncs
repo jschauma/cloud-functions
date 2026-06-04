@@ -55,12 +55,13 @@ LINODE_STACKSCRIPT_DATA="${LINODE_STACKSCRIPT_DATA:-""}"
 # access token, set this variable:
 LINODE_USE_OP="${LINODE_USE_OP:-""}"
 
+alias linode-cli="linode-cli --as-user ${LINODE_USER}"
 if [ -n "${LINODE_USE_OP}" ]; then
 	# If you have your linode-cli creds in a non-default
 	# account, specify it here:
 	LINODE_OP_ACCOUNT="${LINODE_OP_ACCOUNT:-"${OP_ACCOUNT:-"my.1password.com"}"}"
 
-	alias linode-cli='op ${LINODE_OP_ACCOUNT:+--account} ${LINODE_OP_ACCOUNT} plugin run -- linode-cli'
+	alias linode-cli='op ${LINODE_OP_ACCOUNT:+--account} ${LINODE_OP_ACCOUNT} plugin run -- linode-cli --as-user ${LINODE_USER}'
 fi
 
 _tout=$(which timeout 2>/dev/null)
@@ -121,7 +122,8 @@ alias licl_t='linode-cli --as-user ${LINODE_USER} --ascii-table linodes'
 alias newpass='</dev/urandom env LC_ALL=C tr -dc "[:print:]" | head -c 12'
 
 # Linode creation defaults:
-alias linstance='licl create --authorized_users ${LINODE_USER} --private_ip false --root_pass "$(newpass)"'
+#alias linstance='licl create --authorized_users ${LINODE_USER} --private_ip false --root_pass "$(newpass)"'
+alias linstance='licl create --authorized_users ${LINODE_USER} --private_ip false'
 
 launchLinode() {
 	local image="${1:-linode/debian13}"
@@ -134,14 +136,16 @@ launchLinode() {
 		vpcflags="$(_buildVPCFlags)"
 	fi
 
-	vpcregion=$(linode-cli --json vpcs ls --id ${LINODE_VPC} 2>/dev/null | jq -r '.[].region')
-	if [ x"${vpcregion}" != x"${region}" ]; then
-		echo "VPC region (${vpcregion}) != requested region (${region})" >&2;
-		echo "Using ${vpcregion}..." >&2
-		region="${vpcregion}"
+	if [ -n "${LINODE_VPC}" ]; then
+		vpcregion=$(linode-cli --json vpcs ls --id ${LINODE_VPC} 2>/dev/null | jq -r '.[].region')
+		if [ x"${vpcregion}" != x"${region}" ]; then
+			echo "VPC region (${vpcregion}) != requested region (${region})" >&2;
+			echo "Using ${vpcregion}..." >&2
+			region="${vpcregion}"
+		fi
 	fi
 
-	local fw="$(linode-cli --as-user ${LINODE_USER} --json firewalls \
+	local fw="$(linode-cli --json firewalls \
 			ls --label "${LINODE_FIREWALL}" | jq -r '.[].id')"
 
 	linstance --image "${image}"				\
